@@ -88,11 +88,7 @@
 
                             <div class="row">
                                 <div class="col-md-3 form-group">
-                                    <label>Naturalidade</label>
-                                    <input type="text" class="form-control" id="cand_naturalidade_${instanceId}">
-                                </div>
-                                <div class="col-md-3 form-group">
-                                    <label>UF Natal</label>
+                                    <label>Estado Natal</label>
                                     <select class="form-control" id="cand_estado_natal_${instanceId}">
                                         <option value="">Selecione...</option>
                                         <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
@@ -103,6 +99,10 @@
                                         <option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
                                         <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
                                     </select>
+                                </div>
+                                <div class="col-md-3 form-group">
+                                    <label>Naturalidade</label>
+                                    <input type="text" class="form-control" id="cand_naturalidade_${instanceId}">
                                 </div>
                                 <div class="col-md-3 form-group">
                                     <label>Estado Civil</label>
