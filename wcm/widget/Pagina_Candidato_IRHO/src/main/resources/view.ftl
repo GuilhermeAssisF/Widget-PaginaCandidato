@@ -374,12 +374,13 @@
 
                         <div role="tabpanel" class="tab-pane" id="tab_bancarios_${instanceId}">
                             <div class="alert alert-info small">Dados bancários para pagamento.</div>
+                            
                             <div class="row">
                                 <div class="col-md-4 form-group"><label>Banco</label><input type="text" class="form-control" id="cand_banco_${instanceId}"></div>
                                 <div class="col-md-2 form-group"><label>Agência</label><input type="text" class="form-control" id="cand_agencia_${instanceId}"></div>
                                 <div class="col-md-3 form-group"><label>Conta</label><input type="text" class="form-control" id="cand_conta_corrente_${instanceId}"></div>
                                 <div class="col-md-3 form-group">
-                                    <label>Tipo</label>
+                                    <label>Tipo Conta</label>
                                     <select class="form-control" id="cand_tipo_conta_${instanceId}">
                                         <option value="Corrente">Corrente</option>
                                         <option value="Poupanca">Poupança</option>
@@ -387,6 +388,24 @@
                                     </select>
                                 </div>
                             </div>
+
+                            <div class="row">
+                                <div class="col-md-4 form-group">
+                                    <label>Tipo Chave Pix</label>
+                                    <select class="form-control" id="cand_tipo_pix_${instanceId}">
+                                        <option value="">Selecione...</option>
+                                        <option value="CPF_CNPJ">CPF/CNPJ</option>
+                                        <option value="Email">E-mail</option>
+                                        <option value="Celular">Celular</option>
+                                        <option value="Aleatoria">Chave Aleatória</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8 form-group">
+                                    <label>Chave Pix</label>
+                                    <input type="text" class="form-control" id="cand_chave_pix_${instanceId}" placeholder="Informe sua chave pix">
+                                </div>
+                            </div>
+                            
                             <div class="text-right">
                                 <button type="button" class="btn btn-info btn-sm" data-next-tab="#tab_emergencia_${instanceId}">
                                     Próxima Aba <i class="flaticon flaticon-arrow-right"></i>

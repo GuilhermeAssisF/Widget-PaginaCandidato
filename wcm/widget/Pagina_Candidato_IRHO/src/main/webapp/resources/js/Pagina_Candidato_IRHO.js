@@ -407,6 +407,9 @@ var AdmissaoWidget = SuperWidget.extend({
             "AgPagto": $div.find("#cand_agencia_" + that.instanceId).val(),
             "ContPagto": $div.find("#cand_conta_corrente_" + that.instanceId).val(),
             "TipodeContPagto": $div.find("#cand_tipo_conta_" + that.instanceId).val(),
+            "txtTipoChavePix": $div.find("#cand_tipo_pix_" + that.instanceId).val(),
+            "txtChavePix": $div.find("#cand_chave_pix_" + that.instanceId).val(),
+            
             "ValeTransp": ($div.find("#cand_opt_vt_" + that.instanceId).val() == "Sim" ? "1" : "2"),
             "AssistMedica": ($div.find("#cand_opt_saude_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
             "AssistOdontologica": ($div.find("#cand_opt_odonto_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
