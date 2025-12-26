@@ -325,10 +325,36 @@
                             </div>
                             <hr>
                             <div class="row">
-                                <div class="col-md-4 form-group"><label>Deficiência (PCD)</label><input type="text" class="form-control" id="cand_deficiencia_${instanceId}"></div>
-                                <div class="col-md-4 form-group"><label>Tamanho do Calçado</label><input type="number" class="form-control" id="cand_tamanho_calcado_${instanceId}"></div>
-                                <div class="col-md-4 form-group">
-                                    <label>Tamanho da Camisa</label>
+                                <div class="col-md-3 form-group">
+                                    <label style="font-size: 12px;">Possui Deficiência?</label>
+                                    <select class="form-control" id="cand_possui_deficiencia_${instanceId}">
+                                        <option value="">Selecione...</option>
+                                        <option value="Nao">Não</option>
+                                        <option value="Sim">Sim</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3 form-group" id="div_tipo_deficiencia_${instanceId}" style="display:none;">
+                                    <label style="font-size: 12px;">Tipo de Deficiência</label>
+                                    <select class="form-control" id="cand_tipo_deficiencia_${instanceId}">
+                                        <option value="">Selecione...</option>
+                                        <option value="Fisica">Física</option>
+                                        <option value="Auditiva">Auditiva</option>
+                                        <option value="Fala">Fala</option>
+                                        <option value="Visual">Visual</option>
+                                        <option value="Mental">Mental</option>
+                                        <option value="Intelectual">Intelectual</option>
+                                        <option value="Reabilitado">Reabilitado</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3 form-group">
+                                    <label style="font-size: 12px;">Tamanho do Calçado</label>
+                                    <input type="number" class="form-control" id="cand_tamanho_calcado_${instanceId}">
+                                </div>
+
+                                <div class="col-md-3 form-group">
+                                    <label style="font-size: 12px;">Tamanho da Camisa</label>
                                     <select class="form-control" id="cand_tamanho_camisa_${instanceId}">
                                         <option value="">Selecione...</option>
                                         <option value="P">P</option>

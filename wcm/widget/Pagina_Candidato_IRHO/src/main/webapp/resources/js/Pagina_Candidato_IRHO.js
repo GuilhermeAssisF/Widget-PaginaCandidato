@@ -106,7 +106,7 @@ var AdmissaoWidget = SuperWidget.extend({
     iniciarListeners: function ($div) {
         var that = this;
         this.marcarAbaComoVisitada('tab_pessoais_' + this.instanceId);
-        
+
         $div.find('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
             var targetId = $(e.target).attr("href").replace("#", "");
             that.marcarAbaComoVisitada(targetId);
@@ -120,9 +120,9 @@ var AdmissaoWidget = SuperWidget.extend({
         });
 
         if ($div.find(".dependente-card").length === 0) this.adicionarDependente("Mãe", true);
-        
+
         $div.on("input", ".dep-cpf", function () { $(this).val(that.mascaraCPF($(this).val())); });
-        
+
         $("#file_cand_foto_" + this.instanceId).on('change', function () {
             if (this.files && this.files[0]) {
                 var reader = new FileReader();
@@ -130,10 +130,24 @@ var AdmissaoWidget = SuperWidget.extend({
                 reader.readAsDataURL(this.files[0]);
             }
         });
-        
+
         $div.find("#cand_celular_" + this.instanceId + ", #cand_emergencia_telefone_" + this.instanceId).on("input", function () { $(this).val(that.mascaraTelefone($(this).val())); });
         $div.find("#cand_cep_" + this.instanceId).on("input", function () { $(this).val(that.mascaraCEP($(this).val())); });
         $div.find("#cand_cep_" + this.instanceId).on("blur", function () { that.buscaCEP($(this).val()); });
+
+        // Lógica para Mostrar/Ocultar Deficiência
+        $div.find("#cand_possui_deficiencia_" + this.instanceId).on("change", function () {
+            var valor = $(this).val();
+            var $divTipo = $("#div_tipo_deficiencia_" + that.instanceId);
+            var $selectTipo = $("#cand_tipo_deficiencia_" + that.instanceId);
+
+            if (valor === "Sim") {
+                $divTipo.show(); // Mostra o campo de tipo
+            } else {
+                $divTipo.hide(); // Esconde
+                $selectTipo.val(""); // Limpa a seleção anterior para não enviar sujeira
+            }
+        });
     },
 
     mostrarLoading: function (exibir) {
@@ -178,7 +192,7 @@ var AdmissaoWidget = SuperWidget.extend({
     mascaraCEP: function (v) { return v.replace(/\D/g, "").replace(/^(\d{5})(\d)/, "$1-$2").substring(0, 9); },
     mascaraCPF: function (v) { return v.replace(/\D/g, "").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2").substring(0, 14); },
     validarCPF: function (cpf) { if (!cpf) return false; cpf = cpf.replace(/[^\d]+/g, ''); if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false; var s = 0, r; for (var i = 1; i <= 9; i++)s += parseInt(cpf.substring(i - 1, i)) * (11 - i); r = (s * 10) % 11; if (r == 10 || r == 11) r = 0; if (r != parseInt(cpf.substring(9, 10))) return false; s = 0; for (i = 1; i <= 10; i++)s += parseInt(cpf.substring(i - 1, i)) * (12 - i); r = (s * 10) % 11; if (r == 10 || r == 11) r = 0; return r == parseInt(cpf.substring(10, 11)); },
-    
+
     // --- BUSCA CEP INTELIGENTE (MANTIDA) ---
     buscaCEP: function (cep) {
         var that = this; var id = this.instanceId; cep = cep.replace(/\D/g, '');
@@ -194,7 +208,7 @@ var AdmissaoWidget = SuperWidget.extend({
                     // Separação de Rua/Tipo
                     var logradouroFull = dados.logradouro || "";
                     var partes = logradouroFull.split(" ");
-                    var primeiroNome = partes[0]; 
+                    var primeiroNome = partes[0];
                     var tiposComuns = { "Rua": "Rua", "Avenida": "Avenida", "Av": "Avenida", "Av.": "Avenida", "Alameda": "Alameda", "Estrada": "Estrada", "Rodovia": "Rodovia", "Praça": "Praca", "Praca": "Praca", "Travessa": "Travessa", "Viela": "Viela" };
                     if (tiposComuns[primeiroNome]) {
                         $("#cand_tipo_logradouro_" + id).val(tiposComuns[primeiroNome]);
@@ -228,39 +242,39 @@ var AdmissaoWidget = SuperWidget.extend({
 
     avancarAba: function (el) { var $d = $("#AdmissaoWidget_" + this.instanceId); var t = $(el).attr("data-next-tab"); if (t) { $d.find('a[href="' + t + '"]').tab('show'); this.marcarAbaComoVisitada(t.replace("#", "")); } },
     marcarAbaComoVisitada: function (id) { this.abasVisitadas[id] = true; $("#AdmissaoWidget_" + this.instanceId).find('a[href="#' + id + '"]').parent().addClass('aba-visitada'); },
-    
+
     // --- VALIDAÇÃO DE ABAS RESTAURADA ---
     verificarTodasAbasVisitadas: function (silent) { var abas = ['tab_pessoais_', 'tab_endereco_', 'tab_contratacao_', 'tab_bancarios_', 'tab_emergencia_', 'tab_outros_docs_', 'tab_foto_']; for (var i = 0; i < abas.length; i++) { if (!this.abasVisitadas[abas[i] + this.instanceId]) { if (!silent) { $('a[href="#' + abas[i] + this.instanceId + '"]').tab('show'); FLUIGC.toast({ title: 'Atenção', message: 'Verifique a aba pendente.', type: 'info' }); } return false; } } return true; },
-    
+
     proximoPasso: function () { if (this.validarPasso(this.passoAtual) && this.passoAtual < this.totalPassos) this.irParaPasso(this.passoAtual + 1); },
     passoAnterior: function () { if (this.passoAtual > 1) this.irParaPasso(this.passoAtual - 1); },
-    
+
     // --- CORREÇÃO DA BARRA DE PROGRESSO AO VOLTAR ---
-    irParaPasso: function (p) { 
-        var $d = $("#AdmissaoWidget_" + this.instanceId); 
-        
+    irParaPasso: function (p) {
+        var $d = $("#AdmissaoWidget_" + this.instanceId);
+
         // Remove active e completed de tudo primeiro para resetar
-        $d.find('.step-item').removeClass('active completed'); 
-        
+        $d.find('.step-item').removeClass('active completed');
+
         // Adiciona completed apenas nos passos anteriores ao atual
         for (var i = 1; i < p; i++) {
-            $d.find('.step-item[data-step="' + i + '"]').addClass('completed'); 
+            $d.find('.step-item[data-step="' + i + '"]').addClass('completed');
         }
-        
+
         // Ativa o passo atual
-        $d.find('.step-item[data-step="' + p + '"]').addClass('active'); 
-        
+        $d.find('.step-item[data-step="' + p + '"]').addClass('active');
+
         // Troca o conteúdo
-        $d.find('.step-content').removeClass('active'); 
-        $d.find('.step-content[data-step-content="' + p + '"]').addClass('active'); 
-        
-        this.passoAtual = p; 
-        this.atualizarBotoes(); 
-        $('html,body').animate({ scrollTop: $d.offset().top - 60 }, 'fast'); 
+        $d.find('.step-content').removeClass('active');
+        $d.find('.step-content[data-step-content="' + p + '"]').addClass('active');
+
+        this.passoAtual = p;
+        this.atualizarBotoes();
+        $('html,body').animate({ scrollTop: $d.offset().top - 60 }, 'fast');
     },
-    
+
     atualizarBotoes: function () { var $d = $("#AdmissaoWidget_" + this.instanceId); $d.find("[data-nav-back]").prop("disabled", this.passoAtual === 1); if (this.passoAtual === this.totalPassos) { $d.find("[data-nav-next]").hide(); $d.find("[data-finish]").show(); } else { $d.find("[data-nav-next]").show(); $d.find("[data-finish]").hide(); } },
-    
+
     validarPasso: function (p) {
         var $d = $("#AdmissaoWidget_" + this.instanceId); var valid = true; var msg = "";
         if (p == 1 && !$d.find("#chkLGPD_" + this.instanceId).is(":checked")) { msg = "Aceite o termo."; valid = false; }
@@ -284,33 +298,35 @@ var AdmissaoWidget = SuperWidget.extend({
         if (!valid) FLUIGC.toast({ title: 'Atenção', message: msg, type: 'warning' });
         return valid;
     },
-    
+
     adicionarDependenteManual: function () { this.adicionarDependente("", false); },
-    
+
     // --- LÓGICA DE DEPENDENTES RESTAURADA ---
-    adicionarDependente: function (parentesco, obrigatorio) { 
-        var $d = $("#AdmissaoWidget_" + this.instanceId); 
-        var tmpl = $d.find(".template-dependente").html(); 
-        var $card = $(tmpl); 
-        if (obrigatorio) { 
-            $card.find(".dep-parentesco").val(parentesco).prop("readonly", true); 
-            $card.find(".btn-remove-dep").remove(); 
-            $card.find(".panel").css("border-left-color", "#d9534f"); 
-        } 
-        $("#container_dependentes_" + this.instanceId).append($card); 
+    adicionarDependente: function (parentesco, obrigatorio) {
+        var $d = $("#AdmissaoWidget_" + this.instanceId);
+        var tmpl = $d.find(".template-dependente").html();
+        var $card = $(tmpl);
+        if (obrigatorio) {
+            $card.find(".dep-parentesco").val(parentesco).prop("readonly", true);
+            $card.find(".btn-remove-dep").remove();
+            $card.find(".panel").css("border-left-color", "#d9534f");
+        }
+        $("#container_dependentes_" + this.instanceId).append($card);
     },
     removerDependente: function (el) { $(el).closest('.dependente-card').fadeOut(function () { $(this).remove(); }); },
-    
+
     abrirSelecaoArquivo: function (el) { $("#" + $(el).attr("data-trigger-upload")).trigger('click'); },
     processarArquivo: function (el) { var that = this; var input = el; var prefixoCampo = $(el).attr("data-process-file"); if (input.files && input.files[0]) { var file = input.files[0]; if (file.size > 5 * 1024 * 1024) { FLUIGC.toast({ title: 'Erro', message: 'Max 5MB', type: 'danger' }); $(input).val(""); return; } var reader = new FileReader(); reader.onload = function (e) { $("#" + prefixoCampo + "_base64_" + that.instanceId).val(e.target.result); $("#" + prefixoCampo + "_nome_" + that.instanceId).val(file.name); $("#box_" + prefixoCampo + "_" + that.instanceId).addClass("uploaded").css("background", "#dff0d8"); $("#status_" + prefixoCampo + "_" + that.instanceId).html(file.name).css("color", "green"); }; reader.readAsDataURL(file); } },
 
-    // --- ENVIAR API (Campos novos incluídos) ---
+    // --- ENVIAR API 
     enviarAPI: function () {
         var that = this;
         var $div = $("#AdmissaoWidget_" + this.instanceId);
         var idSolicitacao = $("#idSolicitacaoRH_" + this.instanceId).val();
         var btn = $div.find("[data-finish]");
         var textoOriginal = btn.html();
+        
+        // ID do formulário de destino no Fluig (Atenção: Valide se este ID está correto no seu ambiente)
         var ID_FORMULARIO_STAGING = 16707; 
 
         btn.prop("disabled", true).html('<i class="flaticon flaticon-refresh is-spinning"></i> Salvando dados...');
@@ -320,20 +336,38 @@ var AdmissaoWidget = SuperWidget.extend({
             var p = dataUS.split("-");
             return p[2] + "/" + p[1] + "/" + p[0];
         }
+
         function tratarErro(msg) {
             FLUIGC.toast({ title: 'Erro', message: msg, type: 'danger' });
             btn.prop("disabled", false).html(textoOriginal);
         }
 
+        // Verifica se o candidato marcou "Sim" ou "Não"
+        var possuiDeficiencia = $div.find("#cand_possui_deficiencia_" + that.instanceId).val();
+        var tipoDeficiencia = $div.find("#cand_tipo_deficiencia_" + that.instanceId).val();
+        
+        // Se possui, grava o Tipo. Se não, grava "Nao".
+        var valorFinalDeficiencia = (possuiDeficiencia === "Sim") ? tipoDeficiencia : "Nao";
+
         var dadosCandidato = {
             "origem_dados": "pagina_publica_staging",
             "data_integracao": new Date().toLocaleString(),
+            
+            // Dados Pessoais
             "txtNomeColaborador": $div.find("#cand_nomeCompleto_" + that.instanceId).val(),
             "cpfcnpj": $div.find("#cand_cpf_" + that.instanceId).val(),
             "dtDataNascColaborador": formatarDataBR($div.find("#cand_nascimento_" + that.instanceId).val()),
             "txtEmail": $div.find("#cand_email_" + that.instanceId).val(),
             "txtCELULAR": $div.find("#cand_celular_" + that.instanceId).val(),
             
+            // Dados Complementares (Adicionados conforme HTML)
+            "txtEstadoNatal": $div.find("#cand_estado_natal_" + that.instanceId).val(),
+            "txtNaturalidade": $div.find("#cand_naturalidade_" + that.instanceId).val(),
+            "txtEstadoCivil": $div.find("#cand_estado_civil_" + that.instanceId).val(),
+            "txtSexo": $div.find("#cand_sexo_" + that.instanceId).val(),
+            "txtNacionalidade": $div.find("#cand_nacionalidade_" + that.instanceId).val(),
+            "txtRaca": $div.find("#cand_raca_" + that.instanceId).val(),
+
             // RG e Título
             "rg": $div.find("#cand_rg_" + that.instanceId).val(),
             "rg_uf": $div.find("#cand_rg_uf_" + that.instanceId).val(),
@@ -345,7 +379,7 @@ var AdmissaoWidget = SuperWidget.extend({
             "titulo_uf": $div.find("#cand_titulo_uf_" + that.instanceId).val(),
             "titulo_data_emissao": formatarDataBR($div.find("#cand_titulo_data_emissao_" + that.instanceId).val()),
 
-            // Endereço (Novos)
+            // Endereço
             "txtCEP": $div.find("#cand_cep_" + that.instanceId).val(),
             "txtTipoLogradouro": $div.find("#cand_tipo_logradouro_" + that.instanceId).val(),
             "txtRUA": $div.find("#cand_endereco_" + that.instanceId).val(),
@@ -357,6 +391,18 @@ var AdmissaoWidget = SuperWidget.extend({
             "txtNOMECODETD": $div.find("#cand_uf_" + that.instanceId).val(),
             "txtPais": $div.find("#cand_pais_" + that.instanceId).val(),
             
+            // Dados da Contratação (Incluindo a Nova Lógica)
+            "txtDeficiencia": valorFinalDeficiencia, // Campo novo calculado
+            "txtTamanhoCalcado": $div.find("#cand_tamanho_calcado_" + that.instanceId).val(),
+            "txtTamanhoCamisa": $div.find("#cand_tamanho_camisa_" + that.instanceId).val(),
+
+            // Formação Acadêmica
+            "txtGrauInstrucao": $div.find("#cand_grau_instrucao_" + that.instanceId).val(),
+            "txtAnoConclusao": $div.find("#cand_ano_conclusao_" + that.instanceId).val(),
+            "txtNomeCurso": $div.find("#cand_curso_" + that.instanceId).val(),
+            "txtInstituicaoEnsino": $div.find("#cand_instituicao_" + that.instanceId).val(),
+
+            // Dados Bancários e Benefícios
             "BancoPAgto": $div.find("#cand_banco_" + that.instanceId).val(),
             "AgPagto": $div.find("#cand_agencia_" + that.instanceId).val(),
             "ContPagto": $div.find("#cand_conta_corrente_" + that.instanceId).val(),
@@ -364,23 +410,37 @@ var AdmissaoWidget = SuperWidget.extend({
             "ValeTransp": ($div.find("#cand_opt_vt_" + that.instanceId).val() == "Sim" ? "1" : "2"),
             "AssistMedica": ($div.find("#cand_opt_saude_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
             "AssistOdontologica": ($div.find("#cand_opt_odonto_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
-            "cand_foto_base64": $div.find("#cand_foto_base64_" + this.instanceId).val()
+            "cand_foto_base64": $div.find("#cand_foto_base64_" + this.instanceId).val(),
+
+            // Dados de Emergência
+            "txtNomeEmergencia": $div.find("#cand_emergencia_nome_" + that.instanceId).val(),
+            "txtTelefoneEmergencia": $div.find("#cand_emergencia_telefone_" + that.instanceId).val()
         };
 
+        // Processamento dos Dependentes
         var deps = []; 
         $div.find(".dependente-card").each(function(index) { 
             var i = index + 1;
             var c=$(this); 
+            // Salva campos individuais (Padrão Paixão/Fluig para Pai Filho se necessário)
             dadosCandidato["txtNomDepen___" + i] = c.find(".dep-nome").val();
             dadosCandidato["txtSexoDepen___" + i] = c.find(".dep-sexo").val();
             dadosCandidato["cpDataNascimentoDep___" + i] = formatarDataBR(c.find(".dep-nasc").val());
             dadosCandidato["txtParentescoDepen___" + i] = c.find(".dep-parentesco").val();
             dadosCandidato["TxtCPFDep___" + i] = c.find(".dep-cpf").val();
+            dadosCandidato["depEstadoCivil___" + i] = c.find(".dep-est-civil").val(); // Adicionado
             dadosCandidato["TxtIncIRRF___" + i] = (c.find(".dep-ir").val() == "Sim" ? "1" : "0");
-            deps.push({ nome: c.find(".dep-nome").val(), cpf: c.find(".dep-cpf").val() });
+            
+            // Cria objeto para JSON array (opcional, mas útil)
+            deps.push({ 
+                nome: c.find(".dep-nome").val(), 
+                cpf: c.find(".dep-cpf").val(),
+                parentesco: c.find(".dep-parentesco").val()
+            });
         });
         dadosCandidato["json_dependentes"] = JSON.stringify(deps);
 
+        // Processamento dos Documentos (Base64)
         for(var i=0; i<this.configDocs.length; i++) { 
             var d = this.configDocs[i]; 
             if(!d.doc_campo_interno) continue; 
@@ -391,12 +451,21 @@ var AdmissaoWidget = SuperWidget.extend({
 
         var jsonCompleto = JSON.stringify(dadosCandidato);
         
+        // Estrutura para criar o Card no Fluig
         var cardData = [
             { "name": "ref_id_solicitacao", "value": idSolicitacao },
             { "name": "status_integracao", "value": "Pendente" },
             { "name": "data_envio", "value": new Date().toLocaleString() },
             { "name": "json_dados_completos", "value": jsonCompleto }
         ];
+
+        // Mapeia cada propriedade do dadosCandidato como um campo do formulário também
+        // Isso garante que se o formulário destino tiver o campo 'txtDeficiencia', ele será preenchido diretamente
+        for (var key in dadosCandidato) {
+            if (dadosCandidato.hasOwnProperty(key)) {
+                cardData.push({ "name": key, "value": dadosCandidato[key] });
+            }
+        }
 
         var payloadCreateCard = {
             "parentDocumentId": parseInt(ID_FORMULARIO_STAGING),
@@ -405,21 +474,24 @@ var AdmissaoWidget = SuperWidget.extend({
 
         var urlCreate = WCMAPI.getServerURL() + '/api/public/ecm/card/create';
 
+        // 1. Cria o registro de formulário
         $.ajax({
             url: urlCreate, type: 'POST', contentType: 'application/json', data: JSON.stringify(payloadCreateCard),
             headers: { "Authorization": that.getOAuthHeader(urlCreate, 'POST').Authorization },
             success: function (res) {
+                // 2. Se criou com sucesso, movimenta o processo
                 avancarProcesso(idSolicitacao);
             },
             error: function (xhr) {
                 console.error(">>> Erro Create Card:", xhr);
-                tratarErro("Falha ao salvar dados de staging.");
+                tratarErro("Falha ao salvar dados de staging. Verifique a conexão.");
             }
         });
 
         function avancarProcesso(id) {
             var urlMove = WCMAPI.getServerURL() + '/process-management/api/v2/requests/' + id + '/move';
-            var payloadMove = { "movementSequence": 97, "comment": "Dados salvos no Staging Area." };
+            // Sequência 97 é o destino padrão conforme código original. Verifique se isso se mantém.
+            var payloadMove = { "movementSequence": 97, "comment": "Dados salvos no Staging Area via Widget Externa." };
             var authMove = that.getOAuthHeader(urlMove, 'POST', payloadMove);
 
             $.ajax({
@@ -432,7 +504,7 @@ var AdmissaoWidget = SuperWidget.extend({
                 },
                 error: function (xhr) {
                     console.error("Erro Move:", xhr);
-                    tratarErro("Dados salvos, mas erro ao mover processo.");
+                    tratarErro("Dados salvos, mas houve erro ao notificar o RH (Movimentação). Entre em contato.");
                 }
             });
         }
