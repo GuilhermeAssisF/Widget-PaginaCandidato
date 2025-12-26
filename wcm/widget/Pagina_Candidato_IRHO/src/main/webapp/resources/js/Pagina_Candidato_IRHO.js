@@ -1,557 +1,440 @@
 var AdmissaoWidget = SuperWidget.extend({
-    // Variáveis da Widget
     passoAtual: 1,
-    totalPassos: 6,
+    totalPassos: 7,
     configDocs: [],
+    abasVisitadas: {},
+    usuarioIntegracao: "",
+    idOrigem: null,
 
-    // Método executado ao iniciar
+    // --- INICIALIZAÇÃO ---
     init: function () {
         var that = this;
+        var $div = $("#AdmissaoWidget_" + this.instanceId);
 
-        // Captura o ID da URL (?id_origem=12345)
+        // 1. Loading
+        this.mostrarLoading(true);
+
+        // 2. Captura ID
         var urlParams = new URLSearchParams(window.location.search);
-        var idOrigem = urlParams.get('id_origem');
+        this.idOrigem = urlParams.get('id_origem');
 
-        if (idOrigem) {
-            $("#idSolicitacaoRH_" + this.instanceId).val(idOrigem);
-            console.log("ID Origem encontrado: " + idOrigem);
+        // 3. Inicia cadeia: Usuário -> Dados -> Docs
+        this.descobrirUsuarioToken();
 
-            // Chama a função para buscar os dados usando o novo Dataset
-            this.carregarDadosIniciais(idOrigem);
-        } else {
-            console.warn("Nenhum ID de origem encontrado na URL.");
-        }
-
-        this.carregarConfiguracaoDocs();
-
+        this.iniciarListeners($div);
         this.atualizarBotoes();
     },
 
-    carregarDadosIniciais: function (idProcesso) {
+    // -------------------------------------------------------------------------
+    // CADEIA DE CARREGAMENTO
+    // -------------------------------------------------------------------------
+
+    descobrirUsuarioToken: function () {
         var that = this;
+        var url = WCMAPI.getServerURL() + '/api/public/2.0/users/getCurrent';
 
-        // --- 1. DADOS DE AUTENTICAÇÃO (Mantenha suas chaves aqui) --
-        var oauthData = {
-            consumer: {
-                key: 'CONSUMER_KEY',        // CONSUMER_KEY
-                secret: 'CONSUMER_SECRET'   // CONSUMER_SECRET
-            },
-            token: {
-                key: 'ACCESS_TOKEN',        // ACCESS_TOKEN
-                secret: 'SECRET_TOKEN'      // SECRET_TOKEN
-            },
-            signature_method: 'HMAC-SHA1'
-        };
-
-        // --- 2. PREPARAR URL ---
-        var baseUrl = WCMAPI.getServerURL();
-        var urlEndpoint = baseUrl + '/api/public/ecm/dataset/datasets';
-
-        // --- 3. PAYLOAD REAL (O que será enviado) ---
-        var payloadReal = {
-            name: "ds_dados_publicos_candidato",
-            constraints: [{
-                _field: "idProcessoFluig",
-                _initialValue: idProcesso,
-                _finalValue: idProcesso,
-                _type: 1,
-                _likeSearch: false
-            }]
-        };
-
-        // --- 4. DADOS PARA ASSINATURA (O Pulo do Gato) ---
-        // Para JSON, não passamos o 'data' na hora de assinar
-        var requestForSigning = {
-            url: urlEndpoint,
-            method: 'POST',
-            data: {} // VAZIO: O segredo para corrigir o "signature_invalid" em JSON
-        };
-
-        // --- 5. GERAR ASSINATURA ---
-        var oauth = OAuth({
-            consumer: oauthData.consumer,
-            signature_method: oauthData.signature_method,
-            hash_function: function (base_string, key) {
-                return CryptoJS.HmacSHA1(base_string, key).toString(CryptoJS.enc.Base64);
-            }
-        });
-
-        var token = oauthData.token;
-        var authHeader = oauth.toHeader(oauth.authorize(requestForSigning, token));
-
-        // --- 6. CHAMADA AJAX ---
         $.ajax({
-            url: urlEndpoint,
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(payloadReal), // Envia o payload real
-            headers: {
-                "Authorization": authHeader.Authorization
-            },
+            url: url, type: 'GET',
+            headers: { "Authorization": that.getOAuthHeader(url, 'GET').Authorization },
             success: function (data) {
-                if (data && data.content && data.content.values && data.content.values.length > 0) {
-                    var registro = data.content.values[0];
-                    console.log("Registro encontrado:", registro);
-
-                    // --- 1. PREENCHIMENTO DA ABA "SEUS DADOS" (Mantido) ---
-                    if (registro.txtNomeColaborador) {
-                        $("#cand_nomeCompleto_" + that.instanceId).val(registro.txtNomeColaborador);
-                        // Atualiza mensagem de boas vindas se existir o span
-                        $("#span_nome_msg_" + that.instanceId).text(registro.txtNomeColaborador.split(" ")[0]);
-                    }
-                    if (registro.txtEmail) $("#cand_email_" + that.instanceId).val(registro.txtEmail);
-                    if (registro.cpfcnpj) $("#cand_cpf_" + that.instanceId).val(registro.cpfcnpj);
-                    if (registro.txtTELEFONE) $("#cand_celular_" + that.instanceId).val(registro.txtTELEFONE);
-
-                    // Tratamento da Data de Nascimento (Formato DD/MM/AAAA para AAAA-MM-DD se necessário)
-                    var dtNasc = registro.dtDataNascColaborador;
-                    if (dtNasc) {
-                        if (dtNasc.indexOf('/') > -1) {
-                            var p = dtNasc.split('/');
-                            $("#cand_nascimento_" + that.instanceId).val(p[2] + "-" + p[1] + "-" + p[0]);
-                        } else {
-                            $("#cand_nascimento_" + that.instanceId).val(dtNasc);
-                        }
-                    }
-
-                    // --- 2. PREENCHIMENTO DA ABA "CONTRATAÇÃO" (Novos Mapeamentos) ---
-                    // Aqui conectamos o nome da COLUNA DO DATASET ao ID DO HTML
-
-                    if (registro.FUN_EMPRESA_DESC_AD) {
-                        $("#cand_empresa_" + that.instanceId).val(registro.FUN_EMPRESA_DESC_AD);
-                    }
-
-                    if (registro.FUN_ADMISSAO) {
-                        $("#cand_data_admissao_" + that.instanceId).val(registro.FUN_ADMISSAO);
-                    }
-
-                    if (registro.FUN_SECAO_IDDESC_AD) {
-                        $("#cand_secao_" + that.instanceId).val(registro.FUN_SECAO_IDDESC_AD);
-                    }
-
-                    if (registro.FUN_IDDESCFUN) {
-                        $("#cand_funcao_" + that.instanceId).val(registro.FUN_IDDESCFUN);
-                    }
-
-                    if (registro.FUN_VLRSALARIO) {
-                        // Formata para moeda se vier apenas número, ou exibe direto
-                        $("#cand_salario_" + that.instanceId).val(registro.FUN_VLRSALARIO);
-                    }
-
-                    if (registro.FUN_IDDESCTURN) {
-                        $("#cand_turno_" + that.instanceId).val(registro.FUN_IDDESCTURN);
-                    }
-
-                    // --- 3. PREENCHIMENTO DA ABA "EXAME MÉDICO" (Novos Mapeamentos) ---
-
-                    if (registro.cpDataHoraExame) {
-                        $("#cand_exame_datahora_" + that.instanceId).val(registro.cpDataHoraExame);
-                    }
-
-                    if (registro.cpNomeClinica) {
-                        $("#cand_exame_clinica_" + that.instanceId).val(registro.cpNomeClinica);
-                    }
-
-                    if (registro.cpEnderecoClinica) {
-                        $("#cand_exame_endereco_" + that.instanceId).val(registro.cpEnderecoClinica);
-                    }
-
-                    // Se houver campo de orientação, mapeie aqui também
-                    // if (registro.cpOrientacao) $("#cand_exame_orientacao_" + that.instanceId).val(registro.cpOrientacao);
-
-                    FLUIGC.toast({ title: 'Sucesso', message: 'Dados carregados.', type: 'success' });
-                } else {
-                    FLUIGC.toast({ title: 'Atenção', message: 'Solicitação não encontrada ou sem dados públicos.', type: 'warning' });
+                if (data && data.login) {
+                    that.usuarioIntegracao = data.login;
                 }
             },
-            error: function (xhr, status, error) {
-                console.error("Erro OAuth:", xhr);
-                FLUIGC.toast({ title: 'Erro', message: 'Falha na autenticação (' + xhr.status + ' - ' + xhr.statusText + ')', type: 'danger' });
+            error: function () { console.warn("Falha auth usuário."); },
+            complete: function () {
+                if (that.idOrigem) {
+                    $("#idSolicitacaoRH_" + that.instanceId).val(that.idOrigem);
+                    that.carregarDadosIniciais(that.idOrigem);
+                } else {
+                    that.carregarConfiguracaoDocs();
+                }
             }
         });
     },
 
-    // --- NOVAS FUNÇÕES PARA DOCUMENTOS DINÂMICOS ---
+    carregarDadosIniciais: function (id) {
+        var that = this;
+        var url = WCMAPI.getServerURL() + '/api/public/ecm/dataset/datasets';
+        var data = { name: "ds_dados_publicos_candidato", constraints: [{ _field: "idProcessoFluig", _initialValue: id, _finalValue: id, _type: 1, _likeSearch: false }] };
+
+        $.ajax({
+            url: url, type: 'POST', contentType: 'application/json', data: JSON.stringify(data),
+            headers: { "Authorization": that.getOAuthHeader(url, 'POST').Authorization },
+            success: function (res) {
+                if (res.content && res.content.values && res.content.values.length > 0) {
+                    var r = res.content.values[0];
+                    var map = {
+                        "txtNomeColaborador": "cand_nomeCompleto_", "txtEmail": "cand_email_", "cpfcnpj": "cand_cpf_", "txtTELEFONE": "cand_celular_",
+                        "FUN_EMPRESA_DESC_AD": "cand_empresa_", "FUN_ADMISSAO": "cand_data_admissao_", "FUN_SECAO_IDDESC_AD": "cand_secao_",
+                        "FUN_IDDESCFUN": "cand_funcao_", "FUN_VLRSALARIO": "cand_salario_", "FUN_IDDESCTURN": "cand_turno_",
+                        "cpDataHoraExame": "cand_exame_datahora_", "cpNomeClinica": "cand_exame_clinica_", "cpEnderecoClinica": "cand_exame_endereco_"
+                    };
+                    for (var k in map) if (r[k]) $("#" + map[k] + that.instanceId).val(r[k]);
+
+                    if (r.dtDataNascColaborador) {
+                        var d = r.dtDataNascColaborador.split('/');
+                        if (d.length == 3) $("#cand_nascimento_" + that.instanceId).val(d[2] + "-" + d[1] + "-" + d[0]);
+                        else $("#cand_nascimento_" + that.instanceId).val(r.dtDataNascColaborador);
+                    }
+                    if (r.cpOrientacao) { $("#cand_exame_orientacao_" + that.instanceId).val(r.cpOrientacao); $("#text_exame_orientacao_" + that.instanceId).text(r.cpOrientacao); }
+                }
+            },
+            complete: function () { that.carregarConfiguracaoDocs(); }
+        });
+    },
 
     carregarConfiguracaoDocs: function () {
         var that = this;
-        console.log("Iniciando carga de documentos dinâmicos...");
-
-        // Configuração OAuth (Mesmas chaves do seu código original)
-        var oauthData = {
-            consumer: { key: 'CONSUMER_KEY', secret: 'CONSUMER_SECRET' },
-            token: { key: 'ACESS_TOKEN', secret: 'SECRET_TOKEN' },
-            signature_method: 'HMAC-SHA1'
-        };
-
-        var urlEndpoint = WCMAPI.getServerURL() + '/api/public/ecm/dataset/datasets';
-
-        // Payload para buscar o dataset de configuração criado no GED
-        var payload = {
-            name: "ds_config_docs_admissao", // Nome que você definiu na exportação
-            constraints: []
-        };
-
-        var requestForSigning = { url: urlEndpoint, method: 'POST', data: {} };
-        var oauth = OAuth({
-            consumer: oauthData.consumer,
-            signature_method: oauthData.signature_method,
-            hash_function: function (base_string, key) { return CryptoJS.HmacSHA1(base_string, key).toString(CryptoJS.enc.Base64); }
-        });
-
-        var authHeader = oauth.toHeader(oauth.authorize(requestForSigning, oauthData.token));
+        var url = WCMAPI.getServerURL() + '/api/public/ecm/dataset/datasets';
+        var data = { name: "ds_lista_documentos_admissao", constraints: [] };
 
         $.ajax({
-            url: urlEndpoint,
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(payload),
-            headers: { "Authorization": authHeader.Authorization },
-            success: function (data) {
-                if (data && data.content && data.content.values) {
-                    console.log("Configuração de Docs carregada:", data.content.values);
-                    that.renderizarDocumentos(data.content.values);
-                } else {
-                    $("#container_documentos_dinamicos_" + that.instanceId).html('<div class="alert alert-warning">Nenhum documento configurado.</div>');
-                }
+            url: url, type: 'POST', contentType: 'application/json', data: JSON.stringify(data),
+            headers: { "Authorization": that.getOAuthHeader(url, 'POST').Authorization },
+            success: function (res) {
+                if (res.content && res.content.values) that.renderizarDocumentos(res.content.values);
             },
-            error: function (xhr) {
-                console.error("Erro ao carregar config docs", xhr);
-                $("#container_documentos_dinamicos_" + that.instanceId).html('<div class="alert alert-danger">Erro ao carregar documentos.</div>');
+            complete: function () { that.mostrarLoading(false); }
+        });
+    },
+
+    // -------------------------------------------------------------------------
+    // LISTENERS E UI
+    // -------------------------------------------------------------------------
+
+    iniciarListeners: function ($div) {
+        var that = this;
+        this.marcarAbaComoVisitada('tab_pessoais_' + this.instanceId);
+        
+        $div.find('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+            var targetId = $(e.target).attr("href").replace("#", "");
+            that.marcarAbaComoVisitada(targetId);
+        });
+
+        // Hover no botão próximo para avisar sobre abas não visitadas (Trava visual)
+        $div.find("[data-nav-next]").hover(function () {
+            if (that.passoAtual == 2 && !that.verificarTodasAbasVisitadas(true)) {
+                $(this).attr("title", "Você precisa visualizar todas as abas antes de avançar.");
+            } else { $(this).attr("title", ""); }
+        });
+
+        if ($div.find(".dependente-card").length === 0) this.adicionarDependente("Mãe", true);
+        
+        $div.on("input", ".dep-cpf", function () { $(this).val(that.mascaraCPF($(this).val())); });
+        
+        $("#file_cand_foto_" + this.instanceId).on('change', function () {
+            if (this.files && this.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) { $("#preview_foto_" + that.instanceId).css('background-image', 'url(' + e.target.result + ')').css('background-size', 'cover').html(''); }
+                reader.readAsDataURL(this.files[0]);
             }
         });
+        
+        $div.find("#cand_celular_" + this.instanceId + ", #cand_emergencia_telefone_" + this.instanceId).on("input", function () { $(this).val(that.mascaraTelefone($(this).val())); });
+        $div.find("#cand_cep_" + this.instanceId).on("input", function () { $(this).val(that.mascaraCEP($(this).val())); });
+        $div.find("#cand_cep_" + this.instanceId).on("blur", function () { that.buscaCEP($(this).val()); });
+    },
+
+    mostrarLoading: function (exibir) {
+        var $div = $("#AdmissaoWidget_" + this.instanceId);
+        if (exibir) {
+            if ($div.find("#loading_overlay").length === 0) {
+                $div.prepend('<div id="loading_overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column;"><i class="flaticon flaticon-refresh is-spinning icon-xl text-info"></i><h3 style="color:#555; margin-top:20px;">Carregando informações...</h3></div>');
+            }
+            $div.find("#loading_overlay").fadeIn();
+        } else { $div.find("#loading_overlay").fadeOut(); }
+    },
+
+    // --- BINDINGS ORIGINAIS RESTAURADOS ---
+    bindings: {
+        local: {
+            'nav-next': ['click_proximoPasso'], 'nav-back': ['click_passoAnterior'], 'finish': ['click_enviarAPI'],
+            'trigger-upload': ['click_abrirSelecaoArquivo'], 'process-file': ['change_processarArquivo'],
+            'add-dependente': ['click_adicionarDependenteManual'], 'remove-row': ['click_removerDependente'], 'next-tab': ['click_avancarAba']
+        }
+    },
+
+    getOAuthHeader: function (url, method, data) {
+        var oauthData = { consumer: { key: 'app_admissao_candidato', secret: 'Segredo.@dmissao.2025#!' }, token: { key: '36450825-af05-4d9e-8323-49be38f76566', secret: 'c5bce4f3-1c22-4300-ae05-aeaf025842dc68ace6dc-b906-4e55-83eb-01e7e2432f3a' }, signature_method: 'HMAC-SHA1' };
+        var oauth = OAuth({ consumer: oauthData.consumer, signature_method: oauthData.signature_method, hash_function: function (base, key) { return CryptoJS.HmacSHA1(base, key).toString(CryptoJS.enc.Base64); } });
+        return oauth.toHeader(oauth.authorize({ url: url, method: method, data: data || {} }, oauthData.token));
     },
 
     renderizarDocumentos: function (lista) {
-        var that = this;
-        var htmlDocs = "";
-        var htmlInputs = "";
-
-        // Salva na variável global para usar na validação depois
-        this.configDocs = lista;
-
+        var that = this; var html = ""; var inputs = ""; this.configDocs = lista;
         for (var i = 0; i < lista.length; i++) {
-            var doc = lista[i];
-
-            // Pula registros inválidos (às vezes datasets pai-filho trazem metadados)
-            if (!doc.doc_campo_interno) continue;
-
-            var idCampo = doc.doc_campo_interno.trim();
-            var titulo = doc.doc_titulo || "Documento";
-            var desc = doc.doc_descricao || "Anexar arquivo";
-            var icone = doc.doc_icone || "flaticon-file-check";
-            var obrigatorio = (doc.doc_obrigatorio == "true");
-
-            // --- GERA O CARD VISUAL ---
-            htmlDocs += '<div class="col-md-4 col-sm-6 mb-15" style="margin-bottom: 20px;">';
-            // Note o 'upload-box' chamando o ID correto
-            htmlDocs += '  <div class="upload-box" data-trigger-upload="file_' + idCampo + '_' + that.instanceId + '" id="box_' + idCampo + '_' + that.instanceId + '" style="border: 2px dashed #ccc; padding: 20px; text-align: center; border-radius: 5px; cursor: pointer; transition: all 0.3s;">';
-            htmlDocs += '    <i class="flaticon ' + icone + ' icon-xl text-info"></i>';
-            htmlDocs += '    <h5 style="font-weight:bold; margin-top: 10px;">' + titulo + (obrigatorio ? ' <span class="text-danger">*</span>' : '') + '</h5>';
-            htmlDocs += '    <p class="text-muted small" id="status_' + idCampo + '_' + that.instanceId + '">' + desc + '</p>';
-            htmlDocs += '    <button type="button" class="btn btn-default btn-xs" style="margin-top: 5px;">Anexar</button>';
-            htmlDocs += '  </div>';
-            htmlDocs += '</div>';
-
-            // --- GERA OS INPUTS OCULTOS ---
-            // Input File (invisível)
-            htmlInputs += '<input type="file" id="file_' + idCampo + '_' + that.instanceId + '" class="hidden" accept="image/*,application/pdf" data-process-file="' + idCampo + '" style="display:none;">';
-            // Input para salvar o Nome do arquivo
-            htmlInputs += '<input type="hidden" id="' + idCampo + '_nome_' + that.instanceId + '">';
-            // Input para salvar o Base64
-            htmlInputs += '<input type="hidden" id="' + idCampo + '_base64_' + that.instanceId + '">';
+            var d = lista[i]; if (!d.doc_campo_interno) continue;
+            var id = d.doc_campo_interno.trim();
+            var obr = (d.doc_obrigatorio == "true" || d.doc_obrigatorio === true);
+            var ocr = (d.doc_ocr == "true" || d.doc_ocr === true);
+            html += '<div class="col-md-4 mb-15"><div class="upload-box" data-trigger-upload="file_' + id + '_' + that.instanceId + '" id="box_' + id + '_' + that.instanceId + '"><i class="flaticon ' + (d.doc_icone || "flaticon-file-check") + ' icon-xl text-info"></i><h5 class="font-bold mt-10">' + d.doc_titulo + (obr ? ' <span class="text-danger">*</span>' : '') + (ocr ? ' <span class="label label-warning" style="font-size:0.6em">OCR</span>' : '') + '</h5><p class="text-muted small" id="status_' + id + '_' + that.instanceId + '">' + (d.doc_descricao || "Anexar") + '</p><button type="button" class="btn btn-default btn-xs">Anexar</button></div></div>';
+            inputs += '<input type="file" id="file_' + id + '_' + that.instanceId + '" class="hidden" accept="image/*,application/pdf" data-process-file="' + id + '"><input type="hidden" id="' + id + '_nome_' + that.instanceId + '"><input type="hidden" id="' + id + '_base64_' + that.instanceId + '">';
         }
-
-        // Injeta o HTML na página
-        $("#container_documentos_dinamicos_" + that.instanceId).html(htmlDocs);
-        $("#hidden_inputs_container_" + that.instanceId).html(htmlInputs);
-
-        // REAPLICA OS EVENTOS DE CLIQUE (Importante pois o HTML foi recriado)
-        // O Fluig as vezes perde o bind em elementos dinâmicos, então forçamos aqui se necessário,
-        // mas como seu binding usa delegação (se usar 'data-trigger-upload'), deve funcionar.
-        // Se não funcionar o clique, avise que faremos um ajuste no 'bindings'.
+        $("#container_documentos_dinamicos_" + that.instanceId).html(html); $("#hidden_inputs_container_" + that.instanceId).html(inputs);
     },
 
-    // Bindings e demais funções mantidas conforme seu original
-    bindings: {
-        local: {
-            'nav-next': ['click_proximoPasso'],
-            'nav-back': ['click_passoAnterior'],
-            'finish': ['click_enviarAPI'],
-            'trigger-upload': ['click_abrirSelecaoArquivo'],
-            'process-file': ['change_processarArquivo'],
-            'add-dependente': ['click_adicionarDependente'],
-            'remove-row': ['click_removerLinha']
-        }
-    },
+    mascaraTelefone: function (v) { return v.replace(/\D/g, "").replace(/^(\d{2})(\d)/g, "($1) $2").replace(/(\d)(\d{4})$/, "$1-$2").substring(0, 15); },
+    mascaraCEP: function (v) { return v.replace(/\D/g, "").replace(/^(\d{5})(\d)/, "$1-$2").substring(0, 9); },
+    mascaraCPF: function (v) { return v.replace(/\D/g, "").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2").substring(0, 14); },
+    validarCPF: function (cpf) { if (!cpf) return false; cpf = cpf.replace(/[^\d]+/g, ''); if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false; var s = 0, r; for (var i = 1; i <= 9; i++)s += parseInt(cpf.substring(i - 1, i)) * (11 - i); r = (s * 10) % 11; if (r == 10 || r == 11) r = 0; if (r != parseInt(cpf.substring(9, 10))) return false; s = 0; for (i = 1; i <= 10; i++)s += parseInt(cpf.substring(i - 1, i)) * (12 - i); r = (s * 10) % 11; if (r == 10 || r == 11) r = 0; return r == parseInt(cpf.substring(10, 11)); },
+    
+    // --- BUSCA CEP INTELIGENTE (MANTIDA) ---
+    buscaCEP: function (cep) {
+        var that = this; var id = this.instanceId; cep = cep.replace(/\D/g, '');
+        if (cep != "" && /^[0-9]{8}$/.test(cep)) {
+            $("#cand_endereco_" + id).attr("placeholder", "Carregando...").prop("disabled", true);
+            $.getJSON("https://viacep.com.br/ws/" + cep + "/json/?callback=?", function (dados) {
+                $("#cand_endereco_" + id).prop("disabled", false).attr("placeholder", "");
+                if (!("erro" in dados)) {
+                    $("#cand_cidade_" + id).val(dados.localidade);
+                    $("#cand_uf_" + id).val(dados.uf);
+                    $("#cand_pais_" + id).val("Brasil");
 
-    // --- MANTIVE A LÓGICA DE NAVEGAÇÃO E UPLOAD DO SEU ARQUIVO ORIGINAL ---
-    proximoPasso: function () {
-        if (!this.validarPasso(this.passoAtual)) return;
-        if (this.passoAtual < this.totalPassos) {
-            this.irParaPasso(this.passoAtual + 1);
-        }
-    },
+                    // Separação de Rua/Tipo
+                    var logradouroFull = dados.logradouro || "";
+                    var partes = logradouroFull.split(" ");
+                    var primeiroNome = partes[0]; 
+                    var tiposComuns = { "Rua": "Rua", "Avenida": "Avenida", "Av": "Avenida", "Av.": "Avenida", "Alameda": "Alameda", "Estrada": "Estrada", "Rodovia": "Rodovia", "Praça": "Praca", "Praca": "Praca", "Travessa": "Travessa", "Viela": "Viela" };
+                    if (tiposComuns[primeiroNome]) {
+                        $("#cand_tipo_logradouro_" + id).val(tiposComuns[primeiroNome]);
+                        partes.shift();
+                        $("#cand_endereco_" + id).val(partes.join(" "));
+                    } else {
+                        $("#cand_tipo_logradouro_" + id).val("Outro");
+                        $("#cand_endereco_" + id).val(logradouroFull);
+                    }
 
-    passoAnterior: function () {
-        if (this.passoAtual > 1) {
-            this.irParaPasso(this.passoAtual - 1);
+                    // Separação de Bairro/Tipo
+                    var bairroFull = dados.bairro || "";
+                    var partesBairro = bairroFull.split(" ");
+                    var tipoBairro = partesBairro[0];
+                    var tiposBairroMap = ["Jardim", "Vila", "Parque", "Residencial", "Distrito", "Setor"];
+                    if (bairroFull === "Centro") {
+                        $("#cand_tipo_bairro_" + id).val("Centro"); $("#cand_bairro_" + id).val("Centro");
+                    } else if (tiposBairroMap.indexOf(tipoBairro) >= 0) {
+                        $("#cand_tipo_bairro_" + id).val(tipoBairro);
+                        partesBairro.shift();
+                        $("#cand_bairro_" + id).val(partesBairro.join(" "));
+                    } else {
+                        $("#cand_tipo_bairro_" + id).val("Bairro");
+                        $("#cand_bairro_" + id).val(bairroFull);
+                    }
+                    $("#cand_numero_" + id).focus();
+                } else { FLUIGC.toast({ message: 'CEP não encontrado.', type: 'warning' }); $("#cand_endereco_" + id).val(""); }
+            });
         }
     },
 
-    irParaPasso: function (passoDestino) {
-        var $div = $("#AdmissaoWidget_" + this.instanceId);
-        $div.find('.step-item').removeClass('active');
-        for (var i = 1; i < passoDestino; i++) {
-            $div.find('.step-item[data-step="' + i + '"]').addClass('completed');
-        }
-        $div.find('.step-item[data-step="' + passoDestino + '"]').addClass('active');
-        $div.find('.step-content').removeClass('active');
-        $div.find('.step-content[data-step-content="' + passoDestino + '"]').addClass('active');
-        this.passoAtual = passoDestino;
-        this.atualizarBotoes();
-        $('html, body').animate({ scrollTop: $div.offset().top - 60 }, 'fast');
-    },
-
-    validarPasso: function (passo) {
-        var $div = $("#AdmissaoWidget_" + this.instanceId);
-        var isValid = true;
-        var msg = "";
-
-        if (passo == 1) {
-            if (!$div.find("#chkLGPD_" + this.instanceId).is(":checked")) {
-                msg = 'Aceite o termo LGPD para continuar.';
-                isValid = false;
-            }
-        }
-        if (passo == 2) {
-            if ($div.find("#cand_cpf_" + this.instanceId).val() == "") {
-                msg = 'Preencha o CPF.';
-                isValid = false;
-            } else if ($div.find("#cand_nascimento_" + this.instanceId).val() == "") {
-                msg = 'Preencha a Data de Nascimento.';
-                isValid = false;
-            } else if ($div.find("#cand_celular_" + this.instanceId).val() == "") {
-                msg = 'Preencha o Celular.';
-                isValid = false;
-            }
+    avancarAba: function (el) { var $d = $("#AdmissaoWidget_" + this.instanceId); var t = $(el).attr("data-next-tab"); if (t) { $d.find('a[href="' + t + '"]').tab('show'); this.marcarAbaComoVisitada(t.replace("#", "")); } },
+    marcarAbaComoVisitada: function (id) { this.abasVisitadas[id] = true; $("#AdmissaoWidget_" + this.instanceId).find('a[href="#' + id + '"]').parent().addClass('aba-visitada'); },
+    
+    // --- VALIDAÇÃO DE ABAS RESTAURADA ---
+    verificarTodasAbasVisitadas: function (silent) { var abas = ['tab_pessoais_', 'tab_endereco_', 'tab_contratacao_', 'tab_bancarios_', 'tab_emergencia_', 'tab_outros_docs_', 'tab_foto_']; for (var i = 0; i < abas.length; i++) { if (!this.abasVisitadas[abas[i] + this.instanceId]) { if (!silent) { $('a[href="#' + abas[i] + this.instanceId + '"]').tab('show'); FLUIGC.toast({ title: 'Atenção', message: 'Verifique a aba pendente.', type: 'info' }); } return false; } } return true; },
+    
+    proximoPasso: function () { if (this.validarPasso(this.passoAtual) && this.passoAtual < this.totalPassos) this.irParaPasso(this.passoAtual + 1); },
+    passoAnterior: function () { if (this.passoAtual > 1) this.irParaPasso(this.passoAtual - 1); },
+    
+    // --- CORREÇÃO DA BARRA DE PROGRESSO AO VOLTAR ---
+    irParaPasso: function (p) { 
+        var $d = $("#AdmissaoWidget_" + this.instanceId); 
+        
+        // Remove active e completed de tudo primeiro para resetar
+        $d.find('.step-item').removeClass('active completed'); 
+        
+        // Adiciona completed apenas nos passos anteriores ao atual
+        for (var i = 1; i < p; i++) {
+            $d.find('.step-item[data-step="' + i + '"]').addClass('completed'); 
         }
         
-        // --- VALIDAÇÃO DINÂMICA DO PASSO 3 ---
-        if (passo == 3) {
-            if (this.configDocs.length === 0) {
-                console.warn("Nenhuma configuração de documentos carregada.");
-                // Opcional: Bloquear ou deixar passar se falhou a carga
-            }
-
+        // Ativa o passo atual
+        $d.find('.step-item[data-step="' + p + '"]').addClass('active'); 
+        
+        // Troca o conteúdo
+        $d.find('.step-content').removeClass('active'); 
+        $d.find('.step-content[data-step-content="' + p + '"]').addClass('active'); 
+        
+        this.passoAtual = p; 
+        this.atualizarBotoes(); 
+        $('html,body').animate({ scrollTop: $d.offset().top - 60 }, 'fast'); 
+    },
+    
+    atualizarBotoes: function () { var $d = $("#AdmissaoWidget_" + this.instanceId); $d.find("[data-nav-back]").prop("disabled", this.passoAtual === 1); if (this.passoAtual === this.totalPassos) { $d.find("[data-nav-next]").hide(); $d.find("[data-finish]").show(); } else { $d.find("[data-nav-next]").show(); $d.find("[data-finish]").hide(); } },
+    
+    validarPasso: function (p) {
+        var $d = $("#AdmissaoWidget_" + this.instanceId); var valid = true; var msg = "";
+        if (p == 1 && !$d.find("#chkLGPD_" + this.instanceId).is(":checked")) { msg = "Aceite o termo."; valid = false; }
+        if (p == 2) { if (!$d.find("#cand_cpf_" + this.instanceId).val()) { msg = "CPF Obrigatório."; valid = false; } else if (!this.verificarTodasAbasVisitadas(false)) { msg = "Navegue por todas as abas."; valid = false; } }
+        if (p == 3 && !$d.find("#cand_grau_instrucao_" + this.instanceId).val()) { msg = "Grau de Instrução obrigatório."; valid = false; }
+        if (p == 4) {
+            var that = this;
+            $d.find(".dependente-card").each(function (i) {
+                var $c = $(this); var cpf = $c.find(".dep-cpf").val();
+                if (!$c.find(".dep-nome").val() || !cpf) { msg = "Preencha os campos obrigatórios do dependente " + (i + 1); valid = false; return false; }
+                if (!that.validarCPF(cpf)) { msg = "CPF Dependente inválido."; $c.find(".dep-cpf").css("border-color", "red"); valid = false; return false; }
+            });
+        }
+        if (p == 6) {
             for (var i = 0; i < this.configDocs.length; i++) {
-                var doc = this.configDocs[i];
-                // Pula inválidos
-                if (!doc.doc_campo_interno) continue;
-
-                // Verifica se é obrigatório
-                if (doc.doc_obrigatorio == "true" || doc.doc_obrigatorio === true) {
-                    var campo = doc.doc_campo_interno.trim();
-                    var valorBase64 = $div.find("#" + campo + "_base64_" + this.instanceId).val();
-                    
-                    if (!valorBase64 || valorBase64 === "") {
-                        msg = "O documento <strong>" + doc.doc_titulo + "</strong> é obrigatório.";
-                        isValid = false;
-                        break; // Para no primeiro erro e mostra o toast
-                    }
-                }
+                var d = this.configDocs[i];
+                if (d.doc_obrigatorio && !$("#" + d.doc_campo_interno.trim() + "_base64_" + this.instanceId).val()) { msg = d.doc_titulo + " é obrigatório."; valid = false; break; }
             }
         }
-
-        if (!isValid) {
-            FLUIGC.toast({ title: 'Atenção', message: msg, type: 'warning' });
-            return false;
-        }
-        return true;
+        if (p == 7 && !$d.find("#chkVeracidade_" + this.instanceId).is(":checked")) { msg = "Confirme a veracidade."; valid = false; }
+        if (!valid) FLUIGC.toast({ title: 'Atenção', message: msg, type: 'warning' });
+        return valid;
     },
-
-    atualizarBotoes: function () {
-        var $div = $("#AdmissaoWidget_" + this.instanceId);
-        var btnVoltar = $div.find("[data-nav-back]");
-        var btnAvancar = $div.find("[data-nav-next]");
-        var btnFinalizar = $div.find("[data-finish]");
-
-        btnVoltar.prop("disabled", this.passoAtual === 1);
-
-        if (this.passoAtual === this.totalPassos) {
-            btnAvancar.hide();
-            btnFinalizar.show();
-        } else {
-            btnAvancar.show();
-            btnFinalizar.hide();
-        }
+    
+    adicionarDependenteManual: function () { this.adicionarDependente("", false); },
+    
+    // --- LÓGICA DE DEPENDENTES RESTAURADA ---
+    adicionarDependente: function (parentesco, obrigatorio) { 
+        var $d = $("#AdmissaoWidget_" + this.instanceId); 
+        var tmpl = $d.find(".template-dependente").html(); 
+        var $card = $(tmpl); 
+        if (obrigatorio) { 
+            $card.find(".dep-parentesco").val(parentesco).prop("readonly", true); 
+            $card.find(".btn-remove-dep").remove(); 
+            $card.find(".panel").css("border-left-color", "#d9534f"); 
+        } 
+        $("#container_dependentes_" + this.instanceId).append($card); 
     },
+    removerDependente: function (el) { $(el).closest('.dependente-card').fadeOut(function () { $(this).remove(); }); },
+    
+    abrirSelecaoArquivo: function (el) { $("#" + $(el).attr("data-trigger-upload")).trigger('click'); },
+    processarArquivo: function (el) { var that = this; var input = el; var prefixoCampo = $(el).attr("data-process-file"); if (input.files && input.files[0]) { var file = input.files[0]; if (file.size > 5 * 1024 * 1024) { FLUIGC.toast({ title: 'Erro', message: 'Max 5MB', type: 'danger' }); $(input).val(""); return; } var reader = new FileReader(); reader.onload = function (e) { $("#" + prefixoCampo + "_base64_" + that.instanceId).val(e.target.result); $("#" + prefixoCampo + "_nome_" + that.instanceId).val(file.name); $("#box_" + prefixoCampo + "_" + that.instanceId).addClass("uploaded").css("background", "#dff0d8"); $("#status_" + prefixoCampo + "_" + that.instanceId).html(file.name).css("color", "green"); }; reader.readAsDataURL(file); } },
 
-    abrirSelecaoArquivo: function (el) {
-        var idInput = $(el).data("trigger-upload");
-        $("#" + idInput).trigger('click');
-    },
-
-    processarArquivo: function (el) {
-        var that = this;
-        var input = el;
-        var prefixoCampo = $(el).data("process-file");
-
-        if (input.files && input.files[0]) {
-            var file = input.files[0];
-            if (file.size > 5 * 1024 * 1024) {
-                FLUIGC.toast({ title: 'Erro', message: 'O arquivo deve ter no máximo 5MB.', type: 'danger' });
-                $(input).val("");
-                return;
-            }
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                $("#" + prefixoCampo + "_base64_" + that.instanceId).val(e.target.result);
-                $("#" + prefixoCampo + "_nome_" + that.instanceId).val(file.name);
-                var boxId = "#box_" + prefixoCampo + "_" + that.instanceId;
-                var statusId = "#status_" + prefixoCampo + "_" + that.instanceId;
-                $(boxId).addClass("uploaded").css("border-color", "#5cb85c").css("background", "#dff0d8");
-                $(statusId).html('<i class="flaticon flaticon-check"></i> ' + file.name).css("color", "green").attr("title", file.name);
-            };
-            reader.readAsDataURL(file);
-        }
-    },
-
-    adicionarDependente: function () {
-        var template = $(".template-dependente").html();
-        $("#tbDependentes_" + this.instanceId + " tbody").append(template);
-    },
-
-    removerLinha: function (el) {
-        $(el).closest('tr').remove();
-    },
-
+    // --- ENVIAR API (Campos novos incluídos) ---
     enviarAPI: function () {
         var that = this;
         var $div = $("#AdmissaoWidget_" + this.instanceId);
         var idSolicitacao = $("#idSolicitacaoRH_" + this.instanceId).val();
-
-        if (!idSolicitacao) {
-            FLUIGC.toast({ title: 'Erro', message: 'ID da solicitação não encontrado.', type: 'danger' });
-            return;
-        }
-
-        // Feedback Visual
         var btn = $div.find("[data-finish]");
         var textoOriginal = btn.html();
-        btn.prop("disabled", true).html('<i class="flaticon flaticon-refresh is-spinning"></i> Enviando...');
+        var ID_FORMULARIO_STAGING = 16707; 
 
-        // --- 1. PREPARAÇÃO DOS DADOS (PAYLOAD) ---
-        var dadosFormulario = {
-            "origem_dados": "pagina_publica",
-            
-            // Dados Fixos (Etapa 1, 2, 4, 5...)
-            "cpfcnpj": $div.find("#cand_cpf_" + this.instanceId).val(),
-            "dtDataNascColaborador": $div.find("#cand_nascimento_" + this.instanceId).val(),
-            "txtCELULAR": $div.find("#cand_celular_" + this.instanceId).val(),
-            "cand_email": $div.find("#cand_email_" + this.instanceId).val(),
-            "ValeTransp": ($div.find("#cand_opt_vt_" + this.instanceId).val() == "Sim" ? "1" : "2"),
-            "AssistMedica": ($div.find("#cand_opt_saude_" + this.instanceId).val() == "Sim" ? "Sim" : "Nao"),
-            "FUN_TERMO_LGPD_AD_1": "Aceito em " + new Date().toLocaleDateString()
-            // Remova os campos de documentos fixos que estavam aqui ("cand_doc_rg_nome"...)
-        };
+        btn.prop("disabled", true).html('<i class="flaticon flaticon-refresh is-spinning"></i> Salvando dados...');
 
-        // --- ADIÇÃO DINÂMICA DOS DOCUMENTOS ---
-        // Itera sobre a configuração para pegar o que foi uploadado
-        for (var i = 0; i < this.configDocs.length; i++) {
-            var doc = this.configDocs[i];
-            if (!doc.doc_campo_interno) continue;
-
-            var campo = doc.doc_campo_interno.trim();
-            
-            // Adiciona par Nome e Base64 ao JSON
-            // Ex: cand_doc_rg_nome e cand_doc_rg_base64
-            dadosFormulario[campo + "_nome"] = $div.find("#" + campo + "_nome_" + this.instanceId).val();
-            dadosFormulario[campo + "_base64"] = $div.find("#" + campo + "_base64_" + this.instanceId).val();
+        function formatarDataBR(dataUS) {
+            if (!dataUS || dataUS.indexOf("-") === -1) return dataUS;
+            var p = dataUS.split("-");
+            return p[2] + "/" + p[1] + "/" + p[0];
+        }
+        function tratarErro(msg) {
+            FLUIGC.toast({ title: 'Erro', message: msg, type: 'danger' });
+            btn.prop("disabled", false).html(textoOriginal);
         }
 
-        // --- 2. CONFIGURAÇÃO OAUTH ---
-        var oauthData = {
-            consumer: {
-                key: 'CONSUMER_KEY',        // CONSUMER_KEY
-                secret: 'CONSUMER_SECRET'   // CONSUMER_SECRET
-            },
-            token: {
-                key: 'ACCESS_TOKEN',        // ACCESS_TOKEN
-                secret: 'SECRET_TOKEN'      // SECRET_TOKEN
-            },
-            signature_method: 'HMAC-SHA1'
+        var dadosCandidato = {
+            "origem_dados": "pagina_publica_staging",
+            "data_integracao": new Date().toLocaleString(),
+            "txtNomeColaborador": $div.find("#cand_nomeCompleto_" + that.instanceId).val(),
+            "cpfcnpj": $div.find("#cand_cpf_" + that.instanceId).val(),
+            "dtDataNascColaborador": formatarDataBR($div.find("#cand_nascimento_" + that.instanceId).val()),
+            "txtEmail": $div.find("#cand_email_" + that.instanceId).val(),
+            "txtCELULAR": $div.find("#cand_celular_" + that.instanceId).val(),
+            
+            // RG e Título
+            "rg": $div.find("#cand_rg_" + that.instanceId).val(),
+            "rg_uf": $div.find("#cand_rg_uf_" + that.instanceId).val(),
+            "rg_orgao": $div.find("#cand_rg_orgao_" + that.instanceId).val(),
+            "rg_data_emissao": formatarDataBR($div.find("#cand_rg_data_emissao_" + that.instanceId).val()),
+            "titulo_eleitor": $div.find("#cand_titulo_eleitor_" + that.instanceId).val(),
+            "titulo_zona": $div.find("#cand_titulo_zona_" + that.instanceId).val(),
+            "titulo_secao": $div.find("#cand_titulo_secao_" + that.instanceId).val(),
+            "titulo_uf": $div.find("#cand_titulo_uf_" + that.instanceId).val(),
+            "titulo_data_emissao": formatarDataBR($div.find("#cand_titulo_data_emissao_" + that.instanceId).val()),
+
+            // Endereço (Novos)
+            "txtCEP": $div.find("#cand_cep_" + that.instanceId).val(),
+            "txtTipoLogradouro": $div.find("#cand_tipo_logradouro_" + that.instanceId).val(),
+            "txtRUA": $div.find("#cand_endereco_" + that.instanceId).val(),
+            "txtNUMERO": $div.find("#cand_numero_" + that.instanceId).val(),
+            "txtCOMPLEMENTO": $div.find("#cand_complemento_" + that.instanceId).val(),
+            "txtTipoBairro": $div.find("#cand_tipo_bairro_" + that.instanceId).val(),
+            "txtBAIRRO": $div.find("#cand_bairro_" + that.instanceId).val(),
+            "txtNOMEMUNICIPIO": $div.find("#cand_cidade_" + that.instanceId).val(),
+            "txtNOMECODETD": $div.find("#cand_uf_" + that.instanceId).val(),
+            "txtPais": $div.find("#cand_pais_" + that.instanceId).val(),
+            
+            "BancoPAgto": $div.find("#cand_banco_" + that.instanceId).val(),
+            "AgPagto": $div.find("#cand_agencia_" + that.instanceId).val(),
+            "ContPagto": $div.find("#cand_conta_corrente_" + that.instanceId).val(),
+            "TipodeContPagto": $div.find("#cand_tipo_conta_" + that.instanceId).val(),
+            "ValeTransp": ($div.find("#cand_opt_vt_" + that.instanceId).val() == "Sim" ? "1" : "2"),
+            "AssistMedica": ($div.find("#cand_opt_saude_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
+            "AssistOdontologica": ($div.find("#cand_opt_odonto_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
+            "cand_foto_base64": $div.find("#cand_foto_base64_" + this.instanceId).val()
         };
 
-        var baseUrl = WCMAPI.getServerURL();
-        var urlEndpoint = baseUrl + '/process-management/api/v2/requests/' + idSolicitacao + '/move';
-        var proximaAtividade = 97;
-
-        // Payload REAL que será enviado
-        var requestData = {
-            url: urlEndpoint,
-            method: 'POST',
-            data: {
-                "movementSequence": proximaAtividade,
-                "assignee": "admin",
-                "formFields": dadosFormulario
-            }
-        };
-
-        // --- 3. DADOS PARA ASSINATURA (CORREÇÃO DO ERRO 500) ---
-        // O corpo "data" deve ser VAZIO na assinatura de JSON
-        var requestForSigning = {
-            url: urlEndpoint,
-            method: 'POST',
-            data: {}
-        };
-
-        // --- 4. GERAR CABEÇALHO ---
-        var oauth = OAuth({
-            consumer: oauthData.consumer,
-            signature_method: oauthData.signature_method,
-            hash_function: function (base_string, key) {
-                return CryptoJS.HmacSHA1(base_string, key).toString(CryptoJS.enc.Base64);
-            }
+        var deps = []; 
+        $div.find(".dependente-card").each(function(index) { 
+            var i = index + 1;
+            var c=$(this); 
+            dadosCandidato["txtNomDepen___" + i] = c.find(".dep-nome").val();
+            dadosCandidato["txtSexoDepen___" + i] = c.find(".dep-sexo").val();
+            dadosCandidato["cpDataNascimentoDep___" + i] = formatarDataBR(c.find(".dep-nasc").val());
+            dadosCandidato["txtParentescoDepen___" + i] = c.find(".dep-parentesco").val();
+            dadosCandidato["TxtCPFDep___" + i] = c.find(".dep-cpf").val();
+            dadosCandidato["TxtIncIRRF___" + i] = (c.find(".dep-ir").val() == "Sim" ? "1" : "0");
+            deps.push({ nome: c.find(".dep-nome").val(), cpf: c.find(".dep-cpf").val() });
         });
+        dadosCandidato["json_dependentes"] = JSON.stringify(deps);
 
-        var token = oauthData.token;
-        // Assina o objeto vazio, não o payload real
-        var authHeader = oauth.toHeader(oauth.authorize(requestForSigning, token));
+        for(var i=0; i<this.configDocs.length; i++) { 
+            var d = this.configDocs[i]; 
+            if(!d.doc_campo_interno) continue; 
+            var c = d.doc_campo_interno.trim(); 
+            dadosCandidato[c+"_nome"] = $("#"+c+"_nome_"+that.instanceId).val(); 
+            dadosCandidato[c+"_base64"] = $("#"+c+"_base64_"+that.instanceId).val(); 
+        }
 
-        // --- 5. CHAMADA AJAX ---
+        var jsonCompleto = JSON.stringify(dadosCandidato);
+        
+        var cardData = [
+            { "name": "ref_id_solicitacao", "value": idSolicitacao },
+            { "name": "status_integracao", "value": "Pendente" },
+            { "name": "data_envio", "value": new Date().toLocaleString() },
+            { "name": "json_dados_completos", "value": jsonCompleto }
+        ];
+
+        var payloadCreateCard = {
+            "parentDocumentId": parseInt(ID_FORMULARIO_STAGING),
+            "formData": cardData
+        };
+
+        var urlCreate = WCMAPI.getServerURL() + '/api/public/ecm/card/create';
+
         $.ajax({
-            url: requestData.url,
-            type: requestData.method,
-            contentType: 'application/json',
-            headers: {
-                "Authorization": authHeader.Authorization
+            url: urlCreate, type: 'POST', contentType: 'application/json', data: JSON.stringify(payloadCreateCard),
+            headers: { "Authorization": that.getOAuthHeader(urlCreate, 'POST').Authorization },
+            success: function (res) {
+                avancarProcesso(idSolicitacao);
             },
-            data: JSON.stringify(requestData.data), // Envia o payload real
-            success: function (resp) {
-                $div.find(".wizard-card").html(
-                    '<div class="alert alert-success text-center" style="padding: 40px;">' +
-                    '<i class="flaticon flaticon-check-circle icon-xl"></i><br><br>' +
-                    '<h3>Tudo certo!</h3>' +
-                    '<p>Suas informações e documentos foram enviados com sucesso para o RH.</p>' +
-                    '<p>Você pode fechar esta página agora.</p>' +
-                    '</div>'
-                );
-                $('html, body').animate({ scrollTop: $div.offset().top - 100 }, 'slow');
-            },
-            error: function (xhr, status, error) {
-                console.error("Erro API Move (OAuth):", xhr);
-                var msg = 'Não foi possível enviar os dados.';
-
-                if (xhr.status == 500 && xhr.responseText.indexOf("signature_invalid") > -1) {
-                    msg = "Erro de assinatura digital (500). Contate o suporte.";
-                } else if (xhr.status == 403) {
-                    msg = "Permissão negada para movimentar a solicitação.";
-                }
-
-                FLUIGC.toast({ title: 'Erro no envio', message: msg, type: 'danger' });
-                btn.prop("disabled", false).html(textoOriginal);
+            error: function (xhr) {
+                console.error(">>> Erro Create Card:", xhr);
+                tratarErro("Falha ao salvar dados de staging.");
             }
         });
+
+        function avancarProcesso(id) {
+            var urlMove = WCMAPI.getServerURL() + '/process-management/api/v2/requests/' + id + '/move';
+            var payloadMove = { "movementSequence": 97, "comment": "Dados salvos no Staging Area." };
+            var authMove = that.getOAuthHeader(urlMove, 'POST', payloadMove);
+
+            $.ajax({
+                url: urlMove, type: 'POST', contentType: 'application/json',
+                data: JSON.stringify(payloadMove),
+                headers: { "Authorization": authMove.Authorization },
+                success: function () {
+                    $div.find(".wizard-card").html('<div class="alert alert-success text-center" style="padding:40px;"><h3>Sucesso!</h3><p>Seus dados foram enviados para o RH.</p><i class="flaticon flaticon-check-circle icon-xl text-success"></i></div>');
+                    $('html, body').animate({ scrollTop: $div.offset().top - 100 }, 'slow');
+                },
+                error: function (xhr) {
+                    console.error("Erro Move:", xhr);
+                    tratarErro("Dados salvos, mas erro ao mover processo.");
+                }
+            });
+        }
     }
 });
