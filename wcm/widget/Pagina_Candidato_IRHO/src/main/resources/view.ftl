@@ -799,7 +799,7 @@
     </div>
     
     <script type="text/template" class="template-dependente">
-        <div class="col-md-12 dependente-card" style="margin-bottom: 20px;">
+        <div class="col-md-12 dependente-card" data-uuid="{{UUID}}" style="margin-bottom: 20px;">
             <div class="panel panel-default shadow-sm" style="border-left: 5px solid #5bc0de;">
                 <div class="panel-heading" style="display: flex; justify-content: space-between; align-items: center; background-color: #f9f9f9;">
                     <h4 class="panel-title font-bold"><i class="flaticon flaticon-user"></i> Dados do Dependente</h4>
@@ -809,13 +809,26 @@
                 </div>
                 <div class="panel-body">
                     <div class="row">
-                        <div class="col-md-6 form-group">
+                        <div class="col-md-5 form-group">
                             <label>Nome Completo <span class="text-danger">*</span></label>
                             <input type="text" class="form-control dep-nome" placeholder="Nome do dependente">
                         </div>
-                        <div class="col-md-3 form-group">
+                        <div class="col-md-4 form-group">
                             <label>Parentesco <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control dep-parentesco" placeholder="Ex: Pai, Filho...">
+                            <select class="form-control dep-parentesco">
+                                <option value="">Selecione...</option>
+                                <option value="Mae">Mãe</option>
+                                <option value="Pai">Pai</option>
+                                <option value="Filho">Filho</option>
+                                <option value="Filho Invalido">Filho Inválido</option>
+                                <option value="Conjugue">Conjugue</option>
+                                <option value="Companheiro">Companheiro(a)</option>
+                                <option value="Enteado">Enteado(a)</option>
+                                <option value="Irmao">Irmão(a)</option>
+                                <option value="Sogro">Sogro(a)</option>
+                                <option value="Avo">Avô(a)</option>
+                                <option value="Neto">Neto(a)</option>
+                            </select>
                         </div>
                         <div class="col-md-3 form-group">
                             <label>Sexo <span class="text-danger">*</span></label>
@@ -848,32 +861,87 @@
                         </div>
                     </div>
 
-                    <hr style="margin: 10px 0;">
-                    <label style="color: #777; font-size: 11px; text-transform: uppercase;">Incidências (Para fins legais e de desconto)</label>
-                    
-                    <div class="row" style="background: #fcfcfc; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
-                        <div class="col-md-4 form-group">
-                            <label style="font-size: 11px;">Imposto de Renda?</label>
-                            <select class="form-control input-sm dep-ir">
-                                <option value="Nao">Não</option>
-                                <option value="Sim">Sim</option>
-                            </select>
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label><i class="flaticon flaticon-card-id"></i> Doc. Identificação (RG/CPF) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="dep_doc_ident_{{UUID}}_nome_${instanceId}" readonly placeholder="Selecione o arquivo...">
+                                <span class="input-group-btn">
+                                    <button class="btn btn-default" type="button" data-trigger-upload="file_dep_doc_ident_{{UUID}}_${instanceId}">
+                                        <i class="flaticon flaticon-upload"></i> Anexar
+                                    </button>
+                                </span>
+                            </div>
+                            <input type="file" id="file_dep_doc_ident_{{UUID}}_${instanceId}" class="hidden" 
+                                   data-process-file="dep_doc_ident_{{UUID}}" accept="application/pdf,image/*">
+                            <input type="hidden" id="dep_doc_ident_{{UUID}}_base64_${instanceId}">
                         </div>
-                        <div class="col-md-4 form-group">
-                            <label style="font-size: 11px;">IRRF (Retido na Fonte)?</label>
-                            <select class="form-control input-sm dep-irrf">
-                                <option value="Nao">Não</option>
-                                <option value="Sim">Sim</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 form-group">
-                            <label style="font-size: 11px;">Plano de Saúde?</label>
-                            <select class="form-control input-sm dep-plano">
-                                <option value="Nao">Não</option>
-                                <option value="Sim">Sim</option>
-                            </select>
+
+                        <div class="col-md-6 form-group container-certidao" style="display:none;">
+                            <label><i class="flaticon flaticon-document"></i> Certidão de Nascimento <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="dep_doc_certidao_{{UUID}}_nome_${instanceId}" readonly placeholder="Selecione a certidão...">
+                                <span class="input-group-btn">
+                                    <button class="btn btn-default" type="button" data-trigger-upload="file_dep_doc_certidao_{{UUID}}_${instanceId}">
+                                        <i class="flaticon flaticon-upload"></i> Anexar
+                                    </button>
+                                </span>
+                            </div>
+                            <input type="file" id="file_dep_doc_certidao_{{UUID}}_${instanceId}" class="hidden" 
+                                   data-process-file="dep_doc_certidao_{{UUID}}" accept="application/pdf,image/*">
+                            <input type="hidden" id="dep_doc_certidao_{{UUID}}_base64_${instanceId}">
                         </div>
                     </div>
+
+                    <hr style="margin: 15px 0;">
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <label style="color: #777; font-size: 11px; text-transform: uppercase; margin-bottom: 10px;">Incidências</label>
+                            <div style="background: #fcfcfc; padding: 15px; border-radius: 4px; border: 1px solid #eee;">
+                                <div class="row">
+                                    <div class="col-md-4 form-group">
+                                        <label style="font-size: 12px;">Imp. Renda?</label>
+                                        <select class="form-control input-sm dep-ir">
+                                            <option value="Nao">Não</option>
+                                            <option value="Sim">Sim</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 form-group">
+                                        <label style="font-size: 12px;">Salário Família?</label>
+                                        <select class="form-control input-sm dep-sf">
+                                            <option value="Nao">Não</option>
+                                            <option value="Sim">Sim</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 form-group">
+                                        <label style="font-size: 12px;">Pensão Alimentícia?</label>
+                                        <select class="form-control input-sm dep-pensao">
+                                            <option value="Nao">Não</option>
+                                            <option value="Sim">Sim</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 form-group">
+                                        <label style="font-size: 12px;">Assist. Médica?</label>
+                                        <select class="form-control input-sm dep-saude">
+                                            <option value="Nao">Não</option>
+                                            <option value="Sim">Sim</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 form-group">
+                                        <label style="font-size: 12px;">Assist. Odonto?</label>
+                                        <select class="form-control input-sm dep-odonto">
+                                            <option value="Nao">Não</option>
+                                            <option value="Sim">Sim</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
