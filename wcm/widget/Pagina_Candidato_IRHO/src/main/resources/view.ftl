@@ -426,39 +426,153 @@
                         </div>
 
                         <div role="tabpanel" class="tab-pane" id="tab_outros_docs_${instanceId}">
-                            <div class="row form-group">
-                                <div class="col-md-12">
-                                    <label>CNH</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="cand_doc_cnh_nome_${instanceId}" readonly>
-                                        <span class="input-group-btn"><button class="btn btn-default" type="button" data-trigger-upload="file_cand_doc_cnh_${instanceId}">Selecionar</button></span>
+    
+                            <div class="panel panel-default">
+                                <div class="panel-heading"><i class="flaticon flaticon-card-id"></i> Carteira Nacional de Habilitação (CNH)</div>
+                                <div class="panel-body">
+                                    <div class="row">
+                                        <div class="col-md-3 form-group">
+                                            <label>Possui CNH?</label>
+                                            <select class="form-control" id="cand_cnh_possuo_${instanceId}">
+                                                <option value="Nao">Não</option>
+                                                <option value="Sim">Sim</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <input type="file" id="file_cand_doc_cnh_${instanceId}" class="hidden" data-process-file="cand_doc_cnh" accept="application/pdf,image/*">
-                                    <input type="hidden" id="cand_doc_cnh_base64_${instanceId}">
+
+                                    <div id="div_campos_cnh_${instanceId}" style="display:none;">
+                                        <div class="row">
+                                            <div class="col-md-3 form-group">
+                                                <label>Tipo de CNH</label>
+                                                <select class="form-control" id="cand_cnh_tipo_${instanceId}">
+                                                    <option value="">Selecione...</option>
+                                                    <option value="A">A</option>
+                                                    <option value="AB">AB</option>
+                                                    <option value="AC">AC</option>
+                                                    <option value="ACC">ACC</option>
+                                                    <option value="AD">AD</option>
+                                                    <option value="AE">AE</option>
+                                                    <option value="B">B</option>
+                                                    <option value="C">C</option>
+                                                    <option value="D">D</option>
+                                                    <option value="E">E</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3 form-group">
+                                                <label>Data Vencimento</label>
+                                                <input type="date" class="form-control" id="cand_cnh_data_venc_${instanceId}">
+                                            </div>
+                                            <div class="col-md-3 form-group">
+                                                <label>Data 1ª Habilitação</label>
+                                                <input type="date" class="form-control" id="cand_cnh_data_primeira_${instanceId}">
+                                            </div>
+                                            <div class="col-md-3 form-group">
+                                                <label>Data Emissão</label>
+                                                <input type="date" class="form-control" id="cand_cnh_data_emissao_${instanceId}">
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 form-group">
+                                                <label>Órgão Emissor</label>
+                                                <input type="text" class="form-control" id="cand_cnh_orgao_${instanceId}" placeholder="Ex: DETRAN">
+                                            </div>
+                                            <div class="col-md-6 form-group">
+                                                <label>UF da CNH</label>
+                                                <select class="form-control" id="cand_cnh_uf_${instanceId}">
+                                                    <option value="">Selecione...</option>
+                                                    <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
+                                                    <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
+                                                    <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+                                                    <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option>
+                                                    <option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option>
+                                                    <option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+                                                    <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="row form-group">
-                                <div class="col-md-12">
-                                    <label>Reservista</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="cand_doc_reservista_nome_${instanceId}" readonly>
-                                        <span class="input-group-btn"><button class="btn btn-default" type="button" data-trigger-upload="file_cand_doc_reservista_${instanceId}">Selecionar</button></span>
+
+                            <div class="panel panel-default">
+                                <div class="panel-heading"><i class="flaticon flaticon-assignment-ind"></i> Certificado de Reservista</div>
+                                <div class="panel-body">
+                                    <div class="row">
+                                        <div class="col-md-3 form-group">
+                                            <label>Possui Reservista?</label>
+                                            <select class="form-control" id="cand_reservista_possuo_${instanceId}">
+                                                <option value="Nao">Não</option>
+                                                <option value="Sim">Sim</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <input type="file" id="file_cand_doc_reservista_${instanceId}" class="hidden" data-process-file="cand_doc_reservista" accept="application/pdf,image/*">
-                                    <input type="hidden" id="cand_doc_reservista_base64_${instanceId}">
+
+                                    <div id="div_campos_reservista_${instanceId}" style="display:none;">
+                                        <div class="row">
+                                            <div class="col-md-4 form-group">
+                                                <label>Número do Certificado</label>
+                                                <input type="text" class="form-control" id="cand_reservista_numero_${instanceId}">
+                                            </div>
+                                            <div class="col-md-4 form-group">
+                                                <label>Data de Emissão</label>
+                                                <input type="date" class="form-control" id="cand_reservista_data_emissao_${instanceId}">
+                                            </div>
+                                            <div class="col-md-4 form-group">
+                                                <label>Situação Militar</label>
+                                                <input type="text" class="form-control" id="cand_reservista_situacao_${instanceId}" placeholder="Ex: Dispensado">
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="row form-group">
+
+                            <div class="row">
                                 <div class="col-md-12">
-                                    <label>PIS</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="cand_doc_pis_nome_${instanceId}" readonly>
-                                        <span class="input-group-btn"><button class="btn btn-default" type="button" data-trigger-upload="file_cand_doc_pis_${instanceId}">Selecionar</button></span>
+                                    <div class="panel panel-default">
+                                        <div class="panel-heading"><i class="flaticon flaticon-vcard"></i> PIS / PASEP / NIS</div>
+                                        <div class="panel-body">
+                                            <div class="form-group">
+                                                <label>Número PIS/PASEP/NIS</label>
+                                                <input type="text" class="form-control" id="cand_pis_${instanceId}" placeholder="Informe o número">
+                                            </div>
+                                        </div>
                                     </div>
-                                    <input type="file" id="file_cand_doc_pis_${instanceId}" class="hidden" data-process-file="cand_doc_pis" accept="application/pdf,image/*">
-                                    <input type="hidden" id="cand_doc_pis_base64_${instanceId}">
                                 </div>
                             </div>
+
+                            <div class="panel panel-default">
+                                <div class="panel-heading"><i class="flaticon flaticon-book"></i> Carteira de Trabalho (CTPS)</div>
+                                <div class="panel-body">
+                                    <div class="row">
+                                        <div class="col-md-3 form-group">
+                                            <label>Número da Carteira</label>
+                                            <input type="text" class="form-control" id="cand_ctps_numero_${instanceId}">
+                                        </div>
+                                        <div class="col-md-3 form-group">
+                                            <label>Série</label>
+                                            <input type="text" class="form-control" id="cand_ctps_serie_${instanceId}">
+                                        </div>
+                                        <div class="col-md-3 form-group">
+                                            <label>Data de Emissão</label>
+                                            <input type="date" class="form-control" id="cand_ctps_data_emissao_${instanceId}">
+                                        </div>
+                                        <div class="col-md-3 form-group">
+                                            <label>UF da CTPS</label>
+                                            <select class="form-control" id="cand_ctps_uf_${instanceId}">
+                                                <option value="">Selecione...</option>
+                                                <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
+                                                <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
+                                                <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+                                                <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option>
+                                                <option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option>
+                                                <option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+                                                <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="text-right">
                                 <button type="button" class="btn btn-info btn-sm" data-next-tab="#tab_foto_${instanceId}">
                                     Próxima Aba <i class="flaticon flaticon-arrow-right"></i>

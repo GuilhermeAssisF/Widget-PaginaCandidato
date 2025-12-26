@@ -148,6 +148,29 @@ var AdmissaoWidget = SuperWidget.extend({
                 $selectTipo.val(""); // Limpa a seleção anterior para não enviar sujeira
             }
         });
+
+        // CNH
+        $div.find("#cand_cnh_possuo_" + this.instanceId).on("change", function () {
+            var val = $(this).val();
+            if (val === "Sim") {
+                $("#div_campos_cnh_" + that.instanceId).slideDown();
+            } else {
+                $("#div_campos_cnh_" + that.instanceId).slideUp();
+                // Opcional: Limpar campos ao ocultar
+                $div.find("#div_campos_cnh_" + that.instanceId + " input, #div_campos_cnh_" + that.instanceId + " select").val("");
+            }
+        });
+
+        // Reservista
+        $div.find("#cand_reservista_possuo_" + this.instanceId).on("change", function () {
+            var val = $(this).val();
+            if (val === "Sim") {
+                $("#div_campos_reservista_" + that.instanceId).slideDown();
+            } else {
+                $("#div_campos_reservista_" + that.instanceId).slideUp();
+                $div.find("#div_campos_reservista_" + that.instanceId + " input").val("");
+            }
+        });
     },
 
     mostrarLoading: function (exibir) {
@@ -318,16 +341,14 @@ var AdmissaoWidget = SuperWidget.extend({
     abrirSelecaoArquivo: function (el) { $("#" + $(el).attr("data-trigger-upload")).trigger('click'); },
     processarArquivo: function (el) { var that = this; var input = el; var prefixoCampo = $(el).attr("data-process-file"); if (input.files && input.files[0]) { var file = input.files[0]; if (file.size > 5 * 1024 * 1024) { FLUIGC.toast({ title: 'Erro', message: 'Max 5MB', type: 'danger' }); $(input).val(""); return; } var reader = new FileReader(); reader.onload = function (e) { $("#" + prefixoCampo + "_base64_" + that.instanceId).val(e.target.result); $("#" + prefixoCampo + "_nome_" + that.instanceId).val(file.name); $("#box_" + prefixoCampo + "_" + that.instanceId).addClass("uploaded").css("background", "#dff0d8"); $("#status_" + prefixoCampo + "_" + that.instanceId).html(file.name).css("color", "green"); }; reader.readAsDataURL(file); } },
 
-    // --- ENVIAR API 
+    // --- ENVIAR API COMPLETA ---
     enviarAPI: function () {
         var that = this;
         var $div = $("#AdmissaoWidget_" + this.instanceId);
         var idSolicitacao = $("#idSolicitacaoRH_" + this.instanceId).val();
         var btn = $div.find("[data-finish]");
         var textoOriginal = btn.html();
-        
-        // ID do formulário de destino no Fluig (Atenção: Valide se este ID está correto no seu ambiente)
-        var ID_FORMULARIO_STAGING = 16707; 
+        var ID_FORMULARIO_STAGING = 16707;
 
         btn.prop("disabled", true).html('<i class="flaticon flaticon-refresh is-spinning"></i> Salvando dados...');
 
@@ -342,31 +363,40 @@ var AdmissaoWidget = SuperWidget.extend({
             btn.prop("disabled", false).html(textoOriginal);
         }
 
-        // Verifica se o candidato marcou "Sim" ou "Não"
+        // Lógica de Deficiência
         var possuiDeficiencia = $div.find("#cand_possui_deficiencia_" + that.instanceId).val();
         var tipoDeficiencia = $div.find("#cand_tipo_deficiencia_" + that.instanceId).val();
-        
-        // Se possui, grava o Tipo. Se não, grava "Nao".
         var valorFinalDeficiencia = (possuiDeficiencia === "Sim") ? tipoDeficiencia : "Nao";
+
+        // Lógica de CNH (Limpar dados se não possuir)
+        var possuiCNH = $div.find("#cand_cnh_possuo_" + that.instanceId).val();
+        var dadosCNH = {
+            tipo: (possuiCNH == "Sim") ? $div.find("#cand_cnh_tipo_" + that.instanceId).val() : "",
+            vencimento: (possuiCNH == "Sim") ? formatarDataBR($div.find("#cand_cnh_data_venc_" + that.instanceId).val()) : "",
+            primeira: (possuiCNH == "Sim") ? formatarDataBR($div.find("#cand_cnh_data_primeira_" + that.instanceId).val()) : "",
+            emissao: (possuiCNH == "Sim") ? formatarDataBR($div.find("#cand_cnh_data_emissao_" + that.instanceId).val()) : "",
+            orgao: (possuiCNH == "Sim") ? $div.find("#cand_cnh_orgao_" + that.instanceId).val() : "",
+            uf: (possuiCNH == "Sim") ? $div.find("#cand_cnh_uf_" + that.instanceId).val() : ""
+        };
+
+        // Lógica de Reservista
+        var possuiReservista = $div.find("#cand_reservista_possuo_" + that.instanceId).val();
+        var dadosReservista = {
+            numero: (possuiReservista == "Sim") ? $div.find("#cand_reservista_numero_" + that.instanceId).val() : "",
+            emissao: (possuiReservista == "Sim") ? formatarDataBR($div.find("#cand_reservista_data_emissao_" + that.instanceId).val()) : "",
+            situacao: (possuiReservista == "Sim") ? $div.find("#cand_reservista_situacao_" + that.instanceId).val() : ""
+        };
 
         var dadosCandidato = {
             "origem_dados": "pagina_publica_staging",
             "data_integracao": new Date().toLocaleString(),
-            
-            // Dados Pessoais
+
+            // Pessoais
             "txtNomeColaborador": $div.find("#cand_nomeCompleto_" + that.instanceId).val(),
             "cpfcnpj": $div.find("#cand_cpf_" + that.instanceId).val(),
             "dtDataNascColaborador": formatarDataBR($div.find("#cand_nascimento_" + that.instanceId).val()),
             "txtEmail": $div.find("#cand_email_" + that.instanceId).val(),
             "txtCELULAR": $div.find("#cand_celular_" + that.instanceId).val(),
-            
-            // Dados Complementares (Adicionados conforme HTML)
-            "txtEstadoNatal": $div.find("#cand_estado_natal_" + that.instanceId).val(),
-            "txtNaturalidade": $div.find("#cand_naturalidade_" + that.instanceId).val(),
-            "txtEstadoCivil": $div.find("#cand_estado_civil_" + that.instanceId).val(),
-            "txtSexo": $div.find("#cand_sexo_" + that.instanceId).val(),
-            "txtNacionalidade": $div.find("#cand_nacionalidade_" + that.instanceId).val(),
-            "txtRaca": $div.find("#cand_raca_" + that.instanceId).val(),
 
             // RG e Título
             "rg": $div.find("#cand_rg_" + that.instanceId).val(),
@@ -379,7 +409,7 @@ var AdmissaoWidget = SuperWidget.extend({
             "titulo_uf": $div.find("#cand_titulo_uf_" + that.instanceId).val(),
             "titulo_data_emissao": formatarDataBR($div.find("#cand_titulo_data_emissao_" + that.instanceId).val()),
 
-            // Endereço
+            // Endereço e Complementares
             "txtCEP": $div.find("#cand_cep_" + that.instanceId).val(),
             "txtTipoLogradouro": $div.find("#cand_tipo_logradouro_" + that.instanceId).val(),
             "txtRUA": $div.find("#cand_endereco_" + that.instanceId).val(),
@@ -390,71 +420,93 @@ var AdmissaoWidget = SuperWidget.extend({
             "txtNOMEMUNICIPIO": $div.find("#cand_cidade_" + that.instanceId).val(),
             "txtNOMECODETD": $div.find("#cand_uf_" + that.instanceId).val(),
             "txtPais": $div.find("#cand_pais_" + that.instanceId).val(),
-            
-            // Dados da Contratação (Incluindo a Nova Lógica)
-            "txtDeficiencia": valorFinalDeficiencia, // Campo novo calculado
+            "txtEstadoNatal": $div.find("#cand_estado_natal_" + that.instanceId).val(),
+            "txtNaturalidade": $div.find("#cand_naturalidade_" + that.instanceId).val(),
+            "txtEstadoCivil": $div.find("#cand_estado_civil_" + that.instanceId).val(),
+            "txtSexo": $div.find("#cand_sexo_" + that.instanceId).val(),
+            "txtNacionalidade": $div.find("#cand_nacionalidade_" + that.instanceId).val(),
+            "txtRaca": $div.find("#cand_raca_" + that.instanceId).val(),
+
+            // Contratação (Deficiência e Roupas)
+            "txtDeficiencia": valorFinalDeficiencia,
             "txtTamanhoCalcado": $div.find("#cand_tamanho_calcado_" + that.instanceId).val(),
             "txtTamanhoCamisa": $div.find("#cand_tamanho_camisa_" + that.instanceId).val(),
-
-            // Formação Acadêmica
             "txtGrauInstrucao": $div.find("#cand_grau_instrucao_" + that.instanceId).val(),
             "txtAnoConclusao": $div.find("#cand_ano_conclusao_" + that.instanceId).val(),
             "txtNomeCurso": $div.find("#cand_curso_" + that.instanceId).val(),
             "txtInstituicaoEnsino": $div.find("#cand_instituicao_" + that.instanceId).val(),
 
-            // Dados Bancários e Benefícios
+            // Bancários e Pix
             "BancoPAgto": $div.find("#cand_banco_" + that.instanceId).val(),
             "AgPagto": $div.find("#cand_agencia_" + that.instanceId).val(),
             "ContPagto": $div.find("#cand_conta_corrente_" + that.instanceId).val(),
             "TipodeContPagto": $div.find("#cand_tipo_conta_" + that.instanceId).val(),
             "txtTipoChavePix": $div.find("#cand_tipo_pix_" + that.instanceId).val(),
             "txtChavePix": $div.find("#cand_chave_pix_" + that.instanceId).val(),
-            
             "ValeTransp": ($div.find("#cand_opt_vt_" + that.instanceId).val() == "Sim" ? "1" : "2"),
             "AssistMedica": ($div.find("#cand_opt_saude_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
             "AssistOdontologica": ($div.find("#cand_opt_odonto_" + that.instanceId).val() == "Sim" ? "Sim" : "Nao"),
+
+            // === NOVOS DOCUMENTOS ===
+            // CNH
+            "txtCNH_Possui": possuiCNH,
+            "txtCNH_Tipo": dadosCNH.tipo,
+            "txtCNH_DataVencimento": dadosCNH.vencimento,
+            "txtCNH_OrgaoEmissor": dadosCNH.orgao,
+            "txtCNH_DataEmissao": dadosCNH.emissao,
+            "txtCNH_UF": dadosCNH.uf,
+            "txtCNH_DataPrimeira": dadosCNH.primeira,
+
+            // Reservista
+            "txtReservista_Possui": possuiReservista,
+            "txtReservista_Numero": dadosReservista.numero,
+            "txtReservista_DataEmissao": dadosReservista.emissao,
+            "txtReservista_Situacao": dadosReservista.situacao,
+
+            // PIS e CTPS
+            "txtPIS": $div.find("#cand_pis_" + that.instanceId).val(),
+            "txtCTPS_Numero": $div.find("#cand_ctps_numero_" + that.instanceId).val(),
+            "txtCTPS_Serie": $div.find("#cand_ctps_serie_" + that.instanceId).val(),
+            "txtCTPS_DataEmissao": formatarDataBR($div.find("#cand_ctps_data_emissao_" + that.instanceId).val()),
+            "txtCTPS_UF": $div.find("#cand_ctps_uf_" + that.instanceId).val(),
+
+            // Foto
             "cand_foto_base64": $div.find("#cand_foto_base64_" + this.instanceId).val(),
 
-            // Dados de Emergência
+            // Emergência
             "txtNomeEmergencia": $div.find("#cand_emergencia_nome_" + that.instanceId).val(),
             "txtTelefoneEmergencia": $div.find("#cand_emergencia_telefone_" + that.instanceId).val()
         };
 
-        // Processamento dos Dependentes
-        var deps = []; 
-        $div.find(".dependente-card").each(function(index) { 
+        var deps = [];
+        $div.find(".dependente-card").each(function (index) {
             var i = index + 1;
-            var c=$(this); 
-            // Salva campos individuais (Padrão Paixão/Fluig para Pai Filho se necessário)
+            var c = $(this);
             dadosCandidato["txtNomDepen___" + i] = c.find(".dep-nome").val();
             dadosCandidato["txtSexoDepen___" + i] = c.find(".dep-sexo").val();
             dadosCandidato["cpDataNascimentoDep___" + i] = formatarDataBR(c.find(".dep-nasc").val());
             dadosCandidato["txtParentescoDepen___" + i] = c.find(".dep-parentesco").val();
             dadosCandidato["TxtCPFDep___" + i] = c.find(".dep-cpf").val();
-            dadosCandidato["depEstadoCivil___" + i] = c.find(".dep-est-civil").val(); // Adicionado
+            dadosCandidato["depEstadoCivil___" + i] = c.find(".dep-est-civil").val();
             dadosCandidato["TxtIncIRRF___" + i] = (c.find(".dep-ir").val() == "Sim" ? "1" : "0");
-            
-            // Cria objeto para JSON array (opcional, mas útil)
-            deps.push({ 
-                nome: c.find(".dep-nome").val(), 
-                cpf: c.find(".dep-cpf").val(),
-                parentesco: c.find(".dep-parentesco").val()
-            });
+            deps.push({ nome: c.find(".dep-nome").val(), cpf: c.find(".dep-cpf").val() });
         });
         dadosCandidato["json_dependentes"] = JSON.stringify(deps);
 
-        // Processamento dos Documentos (Base64)
-        for(var i=0; i<this.configDocs.length; i++) { 
-            var d = this.configDocs[i]; 
-            if(!d.doc_campo_interno) continue; 
-            var c = d.doc_campo_interno.trim(); 
-            dadosCandidato[c+"_nome"] = $("#"+c+"_nome_"+that.instanceId).val(); 
-            dadosCandidato[c+"_base64"] = $("#"+c+"_base64_"+that.instanceId).val(); 
+        // Processamento dos Documentos de Upload (Passo 6 - Mantido se houver docs lá)
+        for (var i = 0; i < this.configDocs.length; i++) {
+            var d = this.configDocs[i];
+            if (!d.doc_campo_interno) continue;
+            var c = d.doc_campo_interno.trim();
+            // Só tenta pegar base64 se o campo existir no formulário
+            if ($("#" + c + "_base64_" + that.instanceId).length > 0) {
+                dadosCandidato[c + "_nome"] = $("#" + c + "_nome_" + that.instanceId).val();
+                dadosCandidato[c + "_base64"] = $("#" + c + "_base64_" + that.instanceId).val();
+            }
         }
 
         var jsonCompleto = JSON.stringify(dadosCandidato);
-        
-        // Estrutura para criar o Card no Fluig
+
         var cardData = [
             { "name": "ref_id_solicitacao", "value": idSolicitacao },
             { "name": "status_integracao", "value": "Pendente" },
@@ -462,8 +514,6 @@ var AdmissaoWidget = SuperWidget.extend({
             { "name": "json_dados_completos", "value": jsonCompleto }
         ];
 
-        // Mapeia cada propriedade do dadosCandidato como um campo do formulário também
-        // Isso garante que se o formulário destino tiver o campo 'txtDeficiencia', ele será preenchido diretamente
         for (var key in dadosCandidato) {
             if (dadosCandidato.hasOwnProperty(key)) {
                 cardData.push({ "name": key, "value": dadosCandidato[key] });
@@ -477,24 +527,21 @@ var AdmissaoWidget = SuperWidget.extend({
 
         var urlCreate = WCMAPI.getServerURL() + '/api/public/ecm/card/create';
 
-        // 1. Cria o registro de formulário
         $.ajax({
             url: urlCreate, type: 'POST', contentType: 'application/json', data: JSON.stringify(payloadCreateCard),
             headers: { "Authorization": that.getOAuthHeader(urlCreate, 'POST').Authorization },
             success: function (res) {
-                // 2. Se criou com sucesso, movimenta o processo
                 avancarProcesso(idSolicitacao);
             },
             error: function (xhr) {
                 console.error(">>> Erro Create Card:", xhr);
-                tratarErro("Falha ao salvar dados de staging. Verifique a conexão.");
+                tratarErro("Falha ao salvar dados de staging.");
             }
         });
 
         function avancarProcesso(id) {
             var urlMove = WCMAPI.getServerURL() + '/process-management/api/v2/requests/' + id + '/move';
-            // Sequência 97 é o destino padrão conforme código original. Verifique se isso se mantém.
-            var payloadMove = { "movementSequence": 97, "comment": "Dados salvos no Staging Area via Widget Externa." };
+            var payloadMove = { "movementSequence": 97, "comment": "Dados salvos no Staging Area." };
             var authMove = that.getOAuthHeader(urlMove, 'POST', payloadMove);
 
             $.ajax({
@@ -507,7 +554,7 @@ var AdmissaoWidget = SuperWidget.extend({
                 },
                 error: function (xhr) {
                     console.error("Erro Move:", xhr);
-                    tratarErro("Dados salvos, mas houve erro ao notificar o RH (Movimentação). Entre em contato.");
+                    tratarErro("Erro ao mover processo.");
                 }
             });
         }
